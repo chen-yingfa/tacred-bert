@@ -21,7 +21,7 @@ from utils import scorer, constant, helper, torch_utils
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', type=str, default='dataset/tacred-example')
+    parser.add_argument('--data_dir', type=str, default='dataset/tacred')
     parser.add_argument('--emb_dim', type=int, default=300, help='Word embedding dimension.')
     parser.add_argument('--ner_dim', type=int, default=30, help='NER embedding dimension.')
     parser.add_argument('--pos_dim', type=int, default=30, help='POS embedding dimension.')
@@ -44,13 +44,13 @@ def parse_args():
     parser.add_argument('--lr_decay', type=float, default=0.9)
     parser.add_argument('--optim', type=str, default='sgd', help='sgd, adagrad, adam or adamax.')
     parser.add_argument('--num_epoch', type=int, default=16)
-    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--max_grad_norm', type=float, default=5.0, help='Gradient clipping.')
     parser.add_argument('--log_step', type=int, default=50, help='Print log every k steps.')
     parser.add_argument('--log', type=str, default='logs.txt', help='Write training log to file.')
     parser.add_argument('--save_epoch', type=int, default=1, help='Save model checkpoints every k epochs.')
     parser.add_argument('--save_dir', type=str, default='./saved_models', help='Root dir for saving models.')
-    parser.add_argument('--id', type=str, default='pos_pool_example', help='Model ID under which to save models.')
+    parser.add_argument('--id', type=str, default='pos_pool_0.1', help='Model ID under which to save models.')
     parser.add_argument('--info', type=str, default='', help='Optional info for the experiment.')
 
     parser.add_argument('--seed', type=int, default=1234)

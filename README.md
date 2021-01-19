@@ -18,9 +18,9 @@ Train
 python train.py --id "model_folder_name" --data_dir dataset/tacred
 ```
 
-Model checkpoints and logs will be saved to `./saved_models/model_folder_name`.
+Model checkpoints and logs will be saved to `saved_models/model_folder_name`.
 
-Choose input and output representation by setting value of `input_method` and `output_method` in `src/train.py` . 
+Choose input and output representation by setting value of `input_method` and `output_method` in `train.py` . 
 
 Input methods:
 
@@ -48,12 +48,12 @@ Parameters:
 - Transformers Architecture: 12 layers, 768 hidden size, 12 heads
 - Batch size: 8
 - Learning Rate: 3e-5 with Adam
-- 1/10 of train set
+- 1/10 of train set (because I don't have enough computing power)
 
 | Input type      | Output type     | Dev F1 |
 | --------------- | --------------- | ------ |
 | Standard        | [CLS]           | 15.5   |
-| Standard        | Mention pooling |        |
+| Standard        | Mention pooling | 21.3   |
 | Positional emb. | Mention pooling |        |
 | Entity markers  | [CLS]           | 54.0   |
 | Entity markers  | Mention pooling | 48.1   |

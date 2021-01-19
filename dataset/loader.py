@@ -11,7 +11,7 @@ import numpy as np
 
 from transformers import BertTokenizer
 
-from utils import constant, helper, vocab
+from utils import constant, helper
 
 def get_tokenizer():
     """
@@ -33,10 +33,6 @@ def get_tokenizer():
         pickle.dump(tokenizer, open(tokenizer_path, 'wb'))
         print(f"Saved {model_name} tokenizer at {tokenizer_path}")
     tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
-    # # sanity check
-    # e1_id = tokenizer.convert_tokens_to_ids('[E1]')
-    # e2_id = tokenizer.convert_tokens_to_ids('[E2]')
-    # assert e1_id != e2_id != 1
 
     return tokenizer
 
@@ -61,7 +57,7 @@ class DataLoader(object):
 
         with open(filename) as infile:
             data = json.load(infile)
-        # data = data[:(len(data) // 100)]   # only load a part of dataset, for debug
+        # data = data[:(len(data) // 10)]   # only load a part of dataset, for debug
         data = self.preprocess(data)
         # shuffle for training
         if not evaluation:
