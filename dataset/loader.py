@@ -13,11 +13,10 @@ from transformers import BertTokenizer
 
 from utils import constant, helper
 
-def get_tokenizer():
+def get_tokenizer(model_name):
     """
     Load or download BertTokenizer
     """
-    model_name = "BERT"
     tokenizer_path = f"saved_models/{model_name}_tokenizer.pkl"
     if os.path.isfile(tokenizer_path):
         # load from existing file
@@ -26,7 +25,7 @@ def get_tokenizer():
     else:
         # download from pretrained
         tokenizer = BertTokenizer.from_pretrained(
-            "bert-base-uncased",
+            model_name,
             do_lower_case=True)
         
         # save tokenizer

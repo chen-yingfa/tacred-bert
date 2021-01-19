@@ -21,7 +21,7 @@ from utils import scorer, constant, helper, torch_utils
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', type=str, default='dataset/tacred')
+    parser.add_argument('--data_dir', type=str, default='dataset/tacred-example')
     parser.add_argument('--emb_dim', type=int, default=300, help='Word embedding dimension.')
     parser.add_argument('--ner_dim', type=int, default=30, help='NER embedding dimension.')
     parser.add_argument('--pos_dim', type=int, default=30, help='POS embedding dimension.')
@@ -44,13 +44,13 @@ def parse_args():
     parser.add_argument('--lr_decay', type=float, default=0.9)
     parser.add_argument('--optim', type=str, default='sgd', help='sgd, adagrad, adam or adamax.')
     parser.add_argument('--num_epoch', type=int, default=16)
-    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--max_grad_norm', type=float, default=5.0, help='Gradient clipping.')
     parser.add_argument('--log_step', type=int, default=50, help='Print log every k steps.')
     parser.add_argument('--log', type=str, default='logs.txt', help='Write training log to file.')
     parser.add_argument('--save_epoch', type=int, default=1, help='Save model checkpoints every k epochs.')
     parser.add_argument('--save_dir', type=str, default='./saved_models', help='Root dir for saving models.')
-    parser.add_argument('--id', type=str, default='pos_pool_0.1', help='Model ID under which to save models.')
+    parser.add_argument('--id', type=str, default='em_start_example', help='Model ID under which to save models.')
     parser.add_argument('--info', type=str, default='', help='Optional info for the experiment.')
 
     parser.add_argument('--seed', type=int, default=1234)
@@ -63,10 +63,11 @@ args = parse_args()
 # method
 input_method_name = ["", "standard", "positional_embedding", "entity_markers"]
 output_method_name = ["", "cls_token", "mention_pooling", "entity_start"]
-input_method = 2
-output_method = 2
+input_method = 3
+output_method = 3
 print(f"Input method: {input_method_name[input_method]}")
 print(f"Output method: {output_method_name[output_method]}")
+model_name = 'bert-base-uncased'
 
 # seed
 torch.manual_seed(args.seed)
@@ -84,7 +85,7 @@ opt = vars(args)
 opt['num_class'] = len(constant.LABEL_TO_ID)
 
 # load data
-tokenizer = get_tokenizer()
+tokenizer = get_tokenizer(model_name)
 print("Loading data from {} with batch size {}...".format(opt['data_dir'], opt['batch_size']))
 train_batch = DataLoader(opt['data_dir'] + '/train.json', opt['batch_size'], opt, tokenizer, evaluation=False, input_method=input_method)
 dev_batch = DataLoader(opt['data_dir'] + '/dev.json', opt['batch_size'], opt, tokenizer, evaluation=True, input_method=input_method)
@@ -106,7 +107,7 @@ helper.print_config(opt)
 # model
 # model = RelationModel(opt, emb_matrix=emb_matrix)
 model = BertForSequenceClassification.from_pretrained(
-    'bert-base-uncased',
+    model_name,
     num_labels=len(constant.LABEL_TO_ID)
 )
 model.resize_token_embeddings(len(tokenizer))
