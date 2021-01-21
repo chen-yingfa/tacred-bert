@@ -1305,10 +1305,13 @@ class BertForSequenceClassification(BertPreTrainedModel):
         self.num_labels = config.num_labels
 
         self.bert = BertModel(config)
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        # self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.dropout = nn.Dropout()
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.classifier_mention_pooling = nn.Linear(config.hidden_size * 2, config.num_labels)
         self.classifier_entity_start = nn.Linear(config.hidden_size * 2, config.num_labels)
+
+        self.linear = nn.Linear(2 * config.hidden_size, 2 * config.hidden_size)
 
         self.init_weights()
 
@@ -1439,19 +1442,16 @@ class BertForSequenceClassification(BertPreTrainedModel):
             # classify
             
             # print(x.shape)
+            x = self.linear(x)
+            x = self.dropout(x)
             logits = self.classifier_entity_start(x)
         else:
             print("Method must be one of [1, 2, 3]")
             raise ValueError
         loss = None
         if labels is not None:
-            if self.num_labels == 1:
-                #  We are doing regression
-                loss_fct = MSELoss()
-                loss = loss_fct(logits.view(-1), labels.view(-1))
-            else:
-                loss_fct = CrossEntropyLoss()
-                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+            loss_fct = CrossEntropyLoss()
+            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
         if not return_dict:
             output = (logits,) + outputs[2:]
