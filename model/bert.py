@@ -1399,24 +1399,39 @@ class BertForSequenceClassification(BertPreTrainedModel):
             mention_pooling_embed = torch.stack(embeds, dim=0)
             logits = self.classifier_mention_pooling(mention_pooling_embed)
         elif output_method == 3:
-            last_hidden_states = outputs[0]
+            hidden_states = outputs[0]
             batch_size = e1_pos.shape[0]
             
-            e1_start_index = e1_pos[range(batch_size), 0]
-            e2_start_index = e2_pos[range(batch_size), 0]
-            # print(last_hidden_states)
-            # print("e1_pos:", e1_pos)
-            # print("e2_pos:", e2_pos)
-            # print("e1_start_index:", e1_start_index)
-            # print("e2_start_index:", e2_start_index)
-            e1_start_embed = last_hidden_states[range(batch_size), e1_start_index]
-            e2_start_embed = last_hidden_states[range(batch_size), e2_start_index]
-            e1_e2_start_embed = torch.cat((e1_start_embed, e2_start_embed), 1)
-            # print(e1_e2_start_embed.shape)
-            logits = self.classifier_entity_start(e1_e2_start_embed)
-            # print("e1_e2_start_embed.shape:", e1_e2_start_embed.shape)
-            # print("logits:", logits)
-            # print("logits.shape:", logits.shape)
+            # Get embedding of start markers
+
+            # BEGIN
+            # NEW
+
+            print("e2_pos:", e1_pos)
+            print("e2_pos:", e2_pos)
+
+            # Get entity start hidden state
+            onehot1 = torch.zeros(hidden_states.size()[:2]).float().to(input_ids.device)  # (B, L)
+            onehot2 = torch.zeros(hidden_states.size()[:2]).float().to(input_ids.device)  # (B, L)
+            onehot1 = onehot1.scatter_(1, e1_pos, 1)
+            onehot2 = onehot2.scatter_(1, e2_pos, 1)
+
+            hidden1 = (onehot1.unsqueeze(2) * hidden_states).sum(1)  # (B, H)
+            hidden2 = (onehot2.unsqueeze(2) * hidden_states).sum(1)  # (B, H)
+            x = torch.cat([hidden1, hidden2])
+
+            # OLD
+
+            # e1_start_index = e1_pos[range(batch_size), 0]
+            # e2_start_index = e2_pos[range(batch_size), 0]
+            # e1_start_embed = hidden_states[range(batch_size), e1_start_index]
+            # e2_start_embed = hidden_states[range(batch_size), e2_start_index]
+            # x = torch.cat((e1_start_embed, e2_start_embed), 1)
+            
+            # classify
+            
+            print(x.shape)
+            logits = self.classifier_entity_start(x)
         else:
             print("Method must be one of [1, 2, 3]")
             raise ValueError

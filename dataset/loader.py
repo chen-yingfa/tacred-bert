@@ -95,14 +95,6 @@ class DataLoader(object):
             elif self.input_method == 3:
                 # insert entity markers
                 tokens = insert_entity_markers(tokens, (ss, se), (os, oe))
-                if ss < os:
-                    os += 2
-                    oe += 2
-                else:
-                    ss += 2
-                    se += 2
-            e1_pos = (ss, se+1)
-            e2_pos = (os, oe+1)
 
             # convert to id
             sent = ''.join(tokens)
@@ -120,7 +112,7 @@ class DataLoader(object):
             deprel = map_to_ids(d['stanford_deprel'], constant.DEPREL_TO_ID)
             relation = constant.LABEL_TO_ID[d['relation']]
             
-            processed += [(input_ids, e1_pos_seq, e2_pos_seq, deprel, e1_pos, e2_pos, relation, attention_mask)]
+            processed += [(input_ids, e1_pos_seq, e2_pos_seq, deprel, ss, os, relation, attention_mask)]
         return processed
 
     def gold(self):
@@ -140,11 +132,7 @@ class DataLoader(object):
         batch = self.data[key]
         batch_size = len(batch)
         batch = list(zip(*batch))
-        assert len(batch) == 8
-
-        # sort all fields by lens for easy RNN operations
-        # lens = [len(x) for x in batch[0]]
-        # batch, orig_idx = sort_all(batch, lens)
+        assert len(batch) == 7
         
         # word dropout
         if not self.eval:
@@ -154,9 +142,6 @@ class DataLoader(object):
 
         # convert to tensors
         words = get_long_tensor(words, batch_size)
-        # pos = get_long_tensor(batch[1], batch_size)
-        # ner = get_long_tensor(batch[2], batch_size)
-        deprel = get_long_tensor(batch[3], batch_size)
 
         e1_pos_seq = None
         e2_pos_seq = None
@@ -165,13 +150,15 @@ class DataLoader(object):
             e1_pos_seq = get_long_tensor(batch[1], batch_size)
             e2_pos_seq = get_long_tensor(batch[2], batch_size)
 
-        subj_pos = get_long_tensor(batch[4], batch_size)
-        obj_pos = get_long_tensor(batch[5], batch_size)
+        # subj_pos = get_long_tensor(batch[4], batch_size)
+        # obj_pos = get_long_tensor(batch[5], batch_size)
+        e1_pos = torch.LongTensor(batch[3])
+        e2_pos = torch.LongTensor(batch[4])
 
-        rels = torch.LongTensor(batch[6])
-        attention_masks = get_long_tensor(batch[7], batch_size)
+        rels = torch.LongTensor(batch[5])
+        attention_masks = get_long_tensor(batch[6], batch_size)
 
-        return (words, e1_pos_seq, e2_pos_seq, deprel, subj_pos, obj_pos, rels, attention_masks)
+        return (words, e1_pos_seq, e2_pos_seq, subj_pos, obj_pos, rels, attention_masks)
 
     def __iter__(self):
         for i in range(self.__len__()):

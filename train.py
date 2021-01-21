@@ -50,7 +50,7 @@ def parse_args():
     parser.add_argument('--log', type=str, default='logs.txt', help='Write training log to file.')
     parser.add_argument('--save_epoch', type=int, default=1, help='Save model checkpoints every k epochs.')
     parser.add_argument('--save_dir', type=str, default='./saved_models', help='Root dir for saving models.')
-    parser.add_argument('--id', type=str, default='em_start_example', help='Model ID under which to save models.')
+    parser.add_argument('--id', type=str, default='test', help='Model ID under which to save models.')
     parser.add_argument('--info', type=str, default='', help='Optional info for the experiment.')
 
     parser.add_argument('--seed', type=int, default=1234)
@@ -68,6 +68,8 @@ output_method = 3
 print(f"Input method: {input_method_name[input_method]}")
 print(f"Output method: {output_method_name[output_method]}")
 model_name = 'bert-base-uncased'
+
+grad_acc_steps = 64 // args.batch_size
 
 # seed
 torch.manual_seed(args.seed)
@@ -138,7 +140,6 @@ for epoch in range(1, opt['num_epoch']+1):
         start_time = time.time()
         global_step += 1
 
-        optim.zero_grad()
         input_ids, e1_pos_seq, e2_pos_seq, _, e1_pos, e2_pos, labels, att_mask = batch
 
         # change device
@@ -164,7 +165,9 @@ for epoch in range(1, opt['num_epoch']+1):
 
         loss = outputs.loss
         loss.backward()
-        optim.step()
+        if (i + 1) % grad_acc_steps == 0:
+            optim.step()
+            optim.zero_grad()
 
         train_loss += loss
         if global_step % opt['log_step'] == 0:
