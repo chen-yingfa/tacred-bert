@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-#SBATCH --cpu-per-mem=16g
+#SBATCH --mem-per-cpu=16g
 #SBTACH --gpus=1
 #
 
