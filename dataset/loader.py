@@ -112,7 +112,7 @@ class DataLoader(object):
             deprel = map_to_ids(d['stanford_deprel'], constant.DEPREL_TO_ID)
             relation = constant.LABEL_TO_ID[d['relation']]
             
-            processed += [(input_ids, e1_pos_seq, e2_pos_seq, deprel, ss, os, relation, attention_mask)]
+            processed += [(input_ids, e1_pos_seq, e2_pos_seq, [ss], [os], relation, attention_mask)]
         return processed
 
     def gold(self):
@@ -158,7 +158,7 @@ class DataLoader(object):
         rels = torch.LongTensor(batch[5])
         attention_masks = get_long_tensor(batch[6], batch_size)
 
-        return (words, e1_pos_seq, e2_pos_seq, subj_pos, obj_pos, rels, attention_masks)
+        return (words, e1_pos_seq, e2_pos_seq, e1_pos, e2_pos, rels, attention_masks)
 
     def __iter__(self):
         for i in range(self.__len__()):

@@ -21,7 +21,7 @@ from utils import scorer, constant, helper, torch_utils
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', type=str, default='dataset/tacred-example')
+    parser.add_argument('--data_dir', type=str, default='dataset/tacred')
     parser.add_argument('--emb_dim', type=int, default=300, help='Word embedding dimension.')
     parser.add_argument('--ner_dim', type=int, default=30, help='NER embedding dimension.')
     parser.add_argument('--pos_dim', type=int, default=30, help='POS embedding dimension.')
@@ -44,7 +44,7 @@ def parse_args():
     parser.add_argument('--lr_decay', type=float, default=0.9)
     parser.add_argument('--optim', type=str, default='sgd', help='sgd, adagrad, adam or adamax.')
     parser.add_argument('--num_epoch', type=int, default=16)
-    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--max_grad_norm', type=float, default=5.0, help='Gradient clipping.')
     parser.add_argument('--log_step', type=int, default=50, help='Print log every k steps.')
     parser.add_argument('--log', type=str, default='logs.txt', help='Write training log to file.')
@@ -140,7 +140,7 @@ for epoch in range(1, opt['num_epoch']+1):
         start_time = time.time()
         global_step += 1
 
-        input_ids, e1_pos_seq, e2_pos_seq, _, e1_pos, e2_pos, labels, att_mask = batch
+        input_ids, e1_pos_seq, e2_pos_seq, e1_pos, e2_pos, labels, att_mask = batch
 
         # change device
         input_ids = input_ids.to(device)
@@ -182,7 +182,7 @@ for epoch in range(1, opt['num_epoch']+1):
     model.eval()
     with torch.no_grad():
         for i, batch in enumerate(dev_batch):
-            input_ids, e1_pos_seq, e2_pos_seq, _, e1_pos, e2_pos, labels, att_mask = batch
+            input_ids, e1_pos_seq, e2_pos_seq, e1_pos, e2_pos, labels, att_mask = batch
 
             # change device
             input_ids = input_ids.to(device)
