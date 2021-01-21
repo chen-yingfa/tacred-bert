@@ -24,14 +24,11 @@ def get_tokenizer(model_name):
         print("Loaded tokenizer from saved path.")
     else:
         # download from pretrained
-        tokenizer = BertTokenizer.from_pretrained(
-            model_name,
-            do_lower_case=True)
-        
+        tokenizer = BertTokenizer.from_pretrained(model_name)
         # save tokenizer
         pickle.dump(tokenizer, open(tokenizer_path, 'wb'))
         print(f"Saved {model_name} tokenizer at {tokenizer_path}")
-    tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
+    # tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
 
     return tokenizer
 
@@ -64,13 +61,13 @@ class DataLoader(object):
             random.shuffle(indices)
             data = [data[i] for i in indices]
         id2label = dict([(v,k) for k,v in constant.LABEL_TO_ID.items()])
-        self.labels = [id2label[d[-2]] for d in data] 
+        self.labels = [id2label[d[0]] for d in data] 
         self.num_examples = len(data)
 
         # chunk into batches
-        data = [data[i:i+batch_size] for i in range(0, len(data), batch_size)]
+        self.batches = [data[i:i+batch_size] for i in range(0, len(data), batch_size)]
         self.data = data
-        print("{} batches created for {}".format(len(data), filename))
+        print(f"{len(self.batches)} batches, {len(self.data)} examples created for {filename}")
 
     def preprocess(self, data):
         """ Preprocess the data and convert to ids. """
@@ -107,58 +104,54 @@ class DataLoader(object):
             input_ids = encoded['input_ids']
             attention_mask = encoded['attention_mask']
             
-            pos = map_to_ids(d['stanford_pos'], constant.POS_TO_ID)
-            ner = map_to_ids(d['stanford_ner'], constant.NER_TO_ID)
-            deprel = map_to_ids(d['stanford_deprel'], constant.DEPREL_TO_ID)
+            # pos = map_to_ids(d['stanford_pos'], constant.POS_TO_ID)
+            # ner = map_to_ids(d['stanford_ner'], constant.NER_TO_ID)
+            # deprel = map_to_ids(d['stanford_deprel'], constant.DEPREL_TO_ID)
             relation = constant.LABEL_TO_ID[d['relation']]
             
-            processed += [(input_ids, e1_pos_seq, e2_pos_seq, [ss], [os], relation, attention_mask)]
+            processed += [(relation, input_ids, attention_mask, [ss], [os], e1_pos_seq, e2_pos_seq)]
         return processed
 
     def gold(self):
         """ Return gold labels as a list. """
         return self.labels
 
-    def __len__(self):
-        #return 50
+    def num_sents(self):
         return len(self.data)
+
+    def __len__(self):
+        return len(self.batches)
 
     def __getitem__(self, key):
         """ Get a batch with index. """
         if not isinstance(key, int):
             raise TypeError
-        if key < 0 or key >= len(self.data):
+        if key < 0 or key >= len(self.batches):
             raise IndexError
-        batch = self.data[key]
+        batch = self.batches[key]
         batch_size = len(batch)
         batch = list(zip(*batch))
         assert len(batch) == 7
         
         # word dropout
         if not self.eval:
-            words = [word_dropout(sent, self.opt['word_dropout']) for sent in batch[0]]
+            words = [word_dropout(sent, self.opt['word_dropout']) for sent in batch[1]]
         else:
-            words = batch[0]
+            words = batch[1]
 
         # convert to tensors
-        words = get_long_tensor(words, batch_size)
-
-        e1_pos_seq = None
-        e2_pos_seq = None
-        
-        if self.input_method == 2:
-            e1_pos_seq = get_long_tensor(batch[1], batch_size)
-            e2_pos_seq = get_long_tensor(batch[2], batch_size)
-
-        # subj_pos = get_long_tensor(batch[4], batch_size)
-        # obj_pos = get_long_tensor(batch[5], batch_size)
+        rels = torch.LongTensor(batch[0])
+        words = get_long_tensor(batch[1], batch_size)
+        att_mask = get_long_tensor(batch[2], batch_size)
         e1_pos = torch.LongTensor(batch[3])
         e2_pos = torch.LongTensor(batch[4])
 
-        rels = torch.LongTensor(batch[5])
-        attention_masks = get_long_tensor(batch[6], batch_size)
-
-        return (words, e1_pos_seq, e2_pos_seq, e1_pos, e2_pos, rels, attention_masks)
+        e1_pos_seq = None
+        e2_pos_seq = None
+        if self.input_method == 2:
+            e1_pos_seq = get_long_tensor(batch[5], batch_size)
+            e2_pos_seq = get_long_tensor(batch[6], batch_size)
+        return (rels, words, att_mask, e1_pos, e2_pos, e1_pos_seq, e2_pos_seq)
 
     def __iter__(self):
         for i in range(self.__len__()):
@@ -167,21 +160,6 @@ class DataLoader(object):
 def map_to_ids(tokens, vocab):
     ids = [vocab[t] if t in vocab else constant.UNK_ID for t in tokens]
     return ids
-
-def get_token_type_ids(ss, se, os, oe, length):
-    """ Return [0, ..., 0, 1, ..., 1, 0, ..., 0, 2, ..., 2, 0, ..., 0]
-                           ^       ^             ^       ^
-                           ss      se            os      oe
-    """
-    res = []
-    for i in range(length):
-        if ss <= i <= se:
-            res.append(1)
-        elif os <= i <= oe:
-            res.append(2)
-        else:
-            res.append(0)
-    return res
 
 def get_positions(start_idx, end_idx, length):
     """ Get subj/obj position sequence. 
@@ -217,15 +195,15 @@ def word_dropout(tokens, dropout):
 
 def insert_entity_markers(tokens: list, e1_pos, e2_pos):
     if e1_pos[0] < e2_pos[0]:
-        tokens = insert_elem("[/E2]", tokens, e2_pos[1] + 1)
-        tokens = insert_elem("[E2]", tokens, e2_pos[0])
-        tokens = insert_elem("[/E1]", tokens, e1_pos[1] + 1)
-        tokens = insert_elem("[E1]", tokens, e1_pos[0])
+        tokens = insert_elem("[unused3]", tokens, e2_pos[1] + 1)
+        tokens = insert_elem("[unused2]", tokens, e2_pos[0])
+        tokens = insert_elem("[unused1]", tokens, e1_pos[1] + 1)
+        tokens = insert_elem("[unused0]", tokens, e1_pos[0])
     else:
-        tokens = insert_elem("[/E1]", tokens, e1_pos[1] + 1)
-        tokens = insert_elem("[E1]", tokens, e1_pos[0])
-        tokens = insert_elem("[/E2]", tokens, e2_pos[1] + 1)
-        tokens = insert_elem("[E2]", tokens, e2_pos[0])
+        tokens = insert_elem("[unused1]", tokens, e1_pos[1] + 1)
+        tokens = insert_elem("[unused0]", tokens, e1_pos[0])
+        tokens = insert_elem("[unused3]", tokens, e2_pos[1] + 1)
+        tokens = insert_elem("[unused2]", tokens, e2_pos[0])
     return tokens
 
 def insert_elem(elem, lis: list, idx: int):
