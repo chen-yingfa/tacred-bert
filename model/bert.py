@@ -1438,7 +1438,7 @@ class BertForSequenceClassification(BertPreTrainedModel):
             
             # classify
             
-            print(x.shape)
+            # print(x.shape)
             logits = self.classifier_entity_start(x)
         else:
             print("Method must be one of [1, 2, 3]")

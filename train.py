@@ -44,7 +44,7 @@ def parse_args():
     parser.add_argument('--lr_decay', type=float, default=0.9)
     parser.add_argument('--optim', type=str, default='sgd', help='sgd, adagrad, adam or adamax.')
     parser.add_argument('--num_epoch', type=int, default=16)
-    parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--max_grad_norm', type=float, default=5.0, help='Gradient clipping.')
     parser.add_argument('--log_step', type=int, default=50, help='Print log every k steps.')
     parser.add_argument('--log', type=str, default='logs.txt', help='Write training log to file.')
