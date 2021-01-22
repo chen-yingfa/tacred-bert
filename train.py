@@ -12,10 +12,11 @@ from shutil import copyfile
 import torch
 from torch import nn, optim
 from transformers import AdamW
-from model.bert import BertClassifier
+from model.classifier_bert import BertClassifier
 from matplotlib import pyplot as plt
 
 from dataset.loader import DataLoader, get_tokenizer
+from dataset.dataset import REDataLoader
 from utils import scorer, constant, helper, torch_utils
 
 def set_seed(seed):
@@ -26,7 +27,7 @@ def set_seed(seed):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', type=str, default='dataset/tacred')
+    parser.add_argument('--data_dir', type=str, default='dataset/tacred-example')
     parser.add_argument('--word_dropout', type=float, default=0.04, help='The rate at which randomly set a word to UNK.')
     parser.add_argument('--lr', type=float, default=2e-5, help='Applies to SGD and Adagrad.')
     parser.add_argument('--optim', type=str, default='adamw', help='sgd, adam or adamw.')
@@ -54,10 +55,12 @@ print(f"Output method: {output_method_name[output_method]}")
 # constants
 pretrain_path = 'bert-base-uncased'
 device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cpu"
 id2label = dict([(v,k) for k,v in constant.LABEL_TO_ID.items()])
 lr = 2e-5
 weight_decay = 1e-5
 warmup_step = 300
+max_length = 128
 
 set_seed(1234)
 
@@ -67,11 +70,50 @@ opt['num_labels'] = len(constant.LABEL_TO_ID)
 
 grad_acc_steps = 64 // args.batch_size
 
-# load data
+# model
 tokenizer = get_tokenizer(pretrain_path)
-print("Loading data from {} with batch size {}...".format(opt['data_dir'], opt['batch_size']))
-train_loader = DataLoader(opt['data_dir'] + '/train.json', opt['batch_size'], opt, tokenizer, evaluation=False, input_method=input_method)
-dev_loader = DataLoader(opt['data_dir'] + '/dev.json', opt['batch_size'], opt, tokenizer, evaluation=True, input_method=input_method)
+model = BertClassifier(
+    pretrain_path,
+    tokenizer,
+    max_length=max_length,
+    num_labels=len(id2label))
+model.to(device)
+
+# data loader
+train_loader = REDataLoader(
+    opt['data_dir'] + '/train.json',
+    constant.LABEL_TO_ID,
+    model.tokenize,
+    opt['batch_size'],
+    True)
+dev_loader = REDataLoader(
+    opt['data_dir'] + '/dev.json',
+    constant.LABEL_TO_ID,
+    model.tokenize,
+    opt['batch_size'],
+    False)
+test_loader = REDataLoader(
+    opt['data_dir'] + '/test.json',
+    constant.LABEL_TO_ID,
+    model.tokenize,
+    opt['batch_size'],
+    False)
+
+# load data
+# print("Loading data from {} with batch size {}...".format(opt['data_dir'], opt['batch_size']))
+# train_loader = DataLoader(opt['data_dir'] + '/train.json',
+#     opt['batch_size'], 
+#     opt,
+#     tokenizer=tokenizer,
+#     evaluation=False,
+#     input_method=input_method)
+# dev_loader = DataLoader(
+#     opt['data_dir'] + '/dev.json',
+#     opt['batch_size'],
+#     opt,
+#     tokenizer=tokenizer,
+#     evaluation=True,
+#     input_method=input_method)
 
 # model dir
 model_save_dir = opt['save_dir'] + '/' + args.id
@@ -86,14 +128,10 @@ file_logger = helper.FileLogger(model_save_dir + '/' + opt['log'], header="# epo
 # print model info
 helper.print_config(opt)
 
-# model
-model = BertClassifier(pretrain_path, num_labels=opt['num_labels'])
-# model.resize_token_embeddings(len(tokenizer))
-model.to(device)
+train_steps = len(train_loader) // opt['batch_size'] * opt['num_epoch']
 
-max_steps = len(train_loader) * opt['num_epoch']
 optimizer = torch_utils.get_optimizer(opt['optim'], model, lr, weight_decay)
-scheduler = torch_utils.get_scheduler(optimizer, max_steps, warmup_step)
+scheduler = torch_utils.get_scheduler(optimizer, train_steps, warmup_step)
 criterion = nn.CrossEntropyLoss()
 
 global_step = 0
@@ -111,7 +149,9 @@ for epoch in range(1, opt['num_epoch']+1):
     for i, batch in enumerate(train_loader):
         start_time = time.time()
 
-        labels, input_ids, att_mask, e1_pos, e2_pos, e1_pos_seq, e2_pos_seq = batch
+        # labels, input_ids, att_mask, e1_pos, e2_pos, e1_pos_seq, e2_pos_seq = batch
+        # print(batch)
+        labels, input_ids, att_mask, e1_pos, e2_pos = batch
 
         # change device
         labels = labels.to(device)
@@ -123,14 +163,25 @@ for epoch in range(1, opt['num_epoch']+1):
             e1_pos_seq = e1_pos_seq.to(device)
             e2_pos_seq = e2_pos_seq.to(device)
 
+        # print("input_ids:", input_ids)
+        # print(input_ids.shape)
+        # print("att_mask:", att_mask)
+        # print(att_mask.shape)
+        # print("e1_pos:", e1_pos)
+        # print(e1_pos.shape)
+        # print("e2_pos:", e2_pos)
+        # print(e2_pos.shape)
+
+        # exit(0)
+
         # pass to model
         logits = model(
             input_ids,
             attention_mask=att_mask,
             e1_pos=e1_pos,
             e2_pos=e2_pos,
-            e1_pos_seq=e1_pos_seq,
-            e2_pos_seq=e2_pos_seq,
+            # e1_pos_seq=e1_pos_seq,
+            # e2_pos_seq=e2_pos_seq,
             output_method=output_method)
 
         # print(logits)
@@ -141,7 +192,7 @@ for epoch in range(1, opt['num_epoch']+1):
         if global_step % opt['log_step'] == 0:
             duration = time.time() - start_time
             timestr = '{:%m-%d %H:%M:%S}'.format(datetime.now())
-            print(format_str.format(timestr, global_step, max_steps, epoch,\
+            print(format_str.format(timestr, global_step, train_steps, epoch,\
                     opt['num_epoch'], loss, duration))
 
         # optimize
@@ -161,7 +212,8 @@ for epoch in range(1, opt['num_epoch']+1):
     model.eval()
     with torch.no_grad():
         for i, batch in enumerate(dev_loader):
-            labels, input_ids, att_mask, e1_pos, e2_pos, e1_pos_seq, e2_pos_seq = batch
+            # labels, input_ids, att_mask, e1_pos, e2_pos, e1_pos_seq, e2_pos_seq = batch
+            labels, input_ids, att_mask, e1_pos, e2_pos = batch
 
             # change device
             labels = labels.to(device)
@@ -179,8 +231,8 @@ for epoch in range(1, opt['num_epoch']+1):
                 attention_mask=att_mask,
                 e1_pos=e1_pos,
                 e2_pos=e2_pos,
-                e1_pos_seq=e1_pos_seq,
-                e2_pos_seq=e2_pos_seq,
+                # e1_pos_seq=e1_pos_seq,
+                # e2_pos_seq=e2_pos_seq,
                 output_method=output_method)
 
             # logits = outputs.logits
@@ -190,11 +242,14 @@ for epoch in range(1, opt['num_epoch']+1):
             predictions += preds
             dev_loss += loss
         predictions = [id2label[p] for p in predictions]
-        dev_p, dev_r, dev_f1 = scorer.score(dev_loader.gold(), predictions)
-        
+        # dev_p, dev_r, dev_f1 = scorer.score(dev_loader.gold(), predictions)
+        result = dev_loader.dataset.eval(predictions, True)
+        dev_p = result['micro_p']
+        dev_r = result['micro_r']
+        dev_f1 = result['micro_f1']
         # log avg loss per batch
-        train_loss = train_loss / train_loader.num_examples * opt['batch_size']
-        dev_loss = dev_loss / dev_loader.num_examples * opt['batch_size']
+        train_loss = train_loss / len(train_loader.dataset) * opt['batch_size']
+        dev_loss = dev_loss / len(dev_loader.dataset) * opt['batch_size']
         print("epoch {}: train_loss = {:.6f}, dev_loss = {:.6f}, dev_f1 = {:.4f}".format(epoch,\
                 train_loss, dev_loss, dev_f1))
         file_logger.log("{}\t{:.6f}\t{:.6f}\t{:.4f}".format(epoch, train_loss, dev_loss, dev_f1))
@@ -219,7 +274,7 @@ for epoch in range(1, opt['num_epoch']+1):
         list_dev_f1.append(dev_f1)
         plt.xlabel("epoch")
         plt.plot(list_train_loss, label="train loss")
-        plt.plot(list_dev_loss, label="dev loss")
+        plt.plot(list_dev_loss, label="val loss")
         plt.plot(list_dev_f1, label="dev f1")
         plt.legend()
         plt.savefig(model_save_dir + '/loss_f1_vs_epoch.png')

@@ -36,7 +36,7 @@ class DataLoader(object):
     """
     Load data from json files, preprocess and prepare batches.
     """
-    def __init__(self, filename, batch_size, opt, tokenizer=None, evaluation=False, input_method=None):
+    def __init__(self, filename, batch_size, opt, max_len=128, tokenizer=None, evaluation=False, input_method=None):
         self.batch_size = batch_size
         self.opt = opt
         if tokenizer is None:
@@ -45,6 +45,7 @@ class DataLoader(object):
             self.tokenizer = tokenizer
         self.eval = evaluation
         self.input_method = input_method
+        self.max_len = max_len
 
         # Method 1, standard input
         # Method 2, positional embedding
@@ -74,41 +75,98 @@ class DataLoader(object):
         processed = []
         for d in data:
             tokens = d['token']
-            # tokens = [t.lower() for t in tokens]
-            # anonymize tokens
-            ss, se = d['subj_start'], d['subj_end']
-            os, oe = d['obj_start'], d['obj_end']
-
-            max_len = 96
-
-            subj_pos = None
-            obj_pos = None
             e1_pos_seq = None
             e2_pos_seq = None
-            if self.input_method == 2:
-                e1_pos_seq = get_pos_seq(ss, se, max_len)
-                e2_pos_seq = get_pos_seq(os, oe, max_len)
-            elif self.input_method == 3:
-                # insert entity markers
-                tokens = insert_entity_markers(tokens, (ss, se), (os, oe))
 
-            # convert to id
-            sent = ''.join(tokens)
-            encoded = self.tokenizer(
-                sent,
-                max_length=max_len,
-                padding="max_length",
-                truncation=True,
-                return_attention_mask=True,)
-            input_ids = encoded['input_ids']
-            attention_mask = encoded['attention_mask']
+            # # tokens = [t.lower() for t in tokens]
+
+
+            # OLD
+
+            # ss, se = d['subj_start'], d['subj_end']
+            # os, oe = d['obj_start'], d['obj_end']
+
+            # if self.input_method == 2:
+            #     e1_pos_seq = get_pos_seq(ss, se, max_len)
+            #     e2_pos_seq = get_pos_seq(os, oe, max_len)
+            # elif self.input_method == 3:
+            #     # insert entity markers
+            #     rev = ss < os
+            #     tokens = insert_entity_markers(tokens, (ss, se), (os, oe))
+            #     if ss < os:
+            #         ss += 1
+            #         se += 4
+            #         os += 3
+            #         oe += 6
+            #     if rev:
+            #         os += 1
+            #         oe += 4
+            #         ss += 3
+            #         se += 6
+
+            # # convert to id
+            # sent = ''.join(tokens)
+            # encoded = self.tokenizer(
+            #     sent,
+            #     max_length=self.max_len,
+            #     padding="max_length",
+            #     truncation=True,
+            #     return_attention_mask=True,)
+            # input_ids = encoded['input_ids']
+            # att_mask = encoded['att_mask']
+
+
+            # NEW: copy OpenNRE
+
+            tokens = d['token']
+            pos_subj = d['subj_start'], d['subj_end']
+            pos_obj = d['obj_start'], d['obj_end']
+            pos_min = pos_subj
+            pos_max = pos_obj
+            if pos_subj[0] > pos_obj[0]:
+                pos_min = pos_obj
+                pos_max = pos_subj
+                rev = True
+            else:
+                rev = False
+            sent0 = self.tokenizer.tokenize(' '.join(tokens[:pos_min[0]]))
+            ent0 = self.tokenizer.tokenize(' '.join(tokens[pos_min[0]:pos_min[1]]))
+            sent1 = self.tokenizer.tokenize(' '.join(tokens[pos_min[1]:pos_max[0]]))
+            ent1 = self.tokenizer.tokenize(' '.join(tokens[pos_max[0]:pos_max[1]]))
+            sent2 = self.tokenizer.tokenize(' '.join(tokens[pos_max[1]:]))
+
+            ent0 = ['[unused0]'] + ent0 + ['[unused1]'] if not rev else ['[unused2]'] + ent0 + ['[unused3]']
+            ent1 = ['[unused2]'] + ent1 + ['[unused3]'] if not rev else ['[unused0]'] + ent1 + ['[unused1]']
+
+            re_tokens = ['[CLS]'] + sent0 + ent0 + sent1 + ent1 + sent2 + ['[SEP]']
+            ss = 1 + len(sent0) if not rev else 1 + len(sent0 + ent0 + sent1)
+            os = 1 + len(sent0 + ent0 + sent1) if not rev else 1 + len(sent0)
+            ss = min(self.max_len - 1, ss)
+            os = min(self.max_len - 1, os)
             
-            # pos = map_to_ids(d['stanford_pos'], constant.POS_TO_ID)
-            # ner = map_to_ids(d['stanford_ner'], constant.NER_TO_ID)
-            # deprel = map_to_ids(d['stanford_deprel'], constant.DEPREL_TO_ID)
+            input_ids = self.tokenizer.convert_tokens_to_ids(re_tokens)
+            avai_len = len(input_ids)
+
+            # Position
+            ss = torch.tensor([[ss]]).long()
+            os = torch.tensor([[os]]).long()
+
+            # Padding
+            while len(input_ids) < self.max_len:
+                input_ids.append(0)  # 0 is id for [PAD]
+            input_ids = input_ids[:self.max_len]
+            input_ids = torch.tensor(input_ids).long().unsqueeze(0)  # (1, L)
+
+            # Attention mask
+            att_mask = torch.zeros(input_ids.size()).long()  # (1, L)
+            att_mask[0, :avai_len] = 1
+            
+            # # pos = map_to_ids(d['stanford_pos'], constant.POS_TO_ID)
+            # # ner = map_to_ids(d['stanford_ner'], constant.NER_TO_ID)
+            # # deprel = map_to_ids(d['stanford_deprel'], constant.DEPREL_TO_ID)
             relation = constant.LABEL_TO_ID[d['relation']]
-            
-            processed += [(relation, input_ids, attention_mask, [ss], [os], e1_pos_seq, e2_pos_seq)]
+            print(type(input_ids))
+            processed += [(relation, input_ids, att_mask, [ss], [os], e1_pos_seq, e2_pos_seq)]
         return processed
 
     def gold(self):
@@ -133,17 +191,24 @@ class DataLoader(object):
         assert len(batch) == 7
         
         # word dropout
-        if not self.eval:
-            words = [word_dropout(sent, self.opt['word_dropout']) for sent in batch[1]]
-        else:
-            words = batch[1]
+        # if not self.eval:
+        #     words = [word_dropout(sent, self.opt['word_dropout']) for sent in batch[1]]
+        # else:
+        #     words = batch[1]
 
         # convert to tensors
         rels = torch.LongTensor(batch[0])
-        words = get_long_tensor(batch[1], batch_size)
-        att_mask = get_long_tensor(batch[2], batch_size)
-        e1_pos = torch.LongTensor(batch[3])
-        e2_pos = torch.LongTensor(batch[4])
+        # words = get_long_tensor(batch[1], batch_size)
+        # att_mask = get_long_tensor(batch[2], batch_size)
+        # e1_pos = torch.LongTensor(batch[3])
+        # e2_pos = torch.LongTensor(batch[4])
+        
+        # NEW
+        words = batch[1]
+        # print(words)
+        att_mask = batch[2]
+        e1_pos = batch[3]
+        e2_pos = batch[4]
 
         e1_pos_seq = None
         e2_pos_seq = None
