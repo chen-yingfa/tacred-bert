@@ -13,7 +13,7 @@ import torch
 from torch import nn, optim
 from transformers import AdamW
 # from model.classifier_bert import BertClassifier
-from model.bert import BertClassifier
+from model.bert import BertForSequenceClassification
 from matplotlib import pyplot as plt
 
 from dataset.loader import DataLoader, get_tokenizer
@@ -29,10 +29,10 @@ def set_seed(seed):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', type=str, default='dataset/tacred-small')
+    parser.add_argument('--data_dir', type=str, default='dataset/tacred')
     parser.add_argument('--word_dropout', type=float, default=0.04, help='The rate at which randomly set a word to UNK.')
-    parser.add_argument('--lr', type=float, default=2e-1, help='Applies to SGD and Adagrad.')
-    parser.add_argument('--optim', type=str, default='sgd', help='sgd, adam or adamw.')
+    parser.add_argument('--lr', type=float, default=2e-5, help='Applies to SGD and Adagrad.')
+    parser.add_argument('--optim', type=str, default='adamw', help='sgd, adam or adamw.')
     parser.add_argument('--num_epoch', type=int, default=16)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--max_grad_norm', type=float, default=5.0, help='Gradient clipping.')
@@ -76,11 +76,15 @@ def main():
 
     # model
     tokenizer = get_tokenizer(pretrain_path)
-    model = BertClassifier(
+    model = BertForSequenceClassification.from_pretrained(
         pretrain_path,
-        tokenizer,
-        max_length=max_length,
         num_labels=len(id2label))
+    model.set_tokenizer(tokenizer, max_length)
+    # model = BertClassifier(
+    #     pretrain_path,
+    #     tokenizer,
+    #     max_length=max_length,
+    #     num_labels=len(id2label))
     model.to(device)
 
     # data loader
