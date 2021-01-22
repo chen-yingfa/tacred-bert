@@ -971,36 +971,23 @@ class BertForPreTraining(BertPreTrainedModel):
         )
 
 
-@add_start_docstrings(
-    """
-    Bert Model transformer with a sequence classification/regression head on top (a linear layer on top of the pooled
-    output) e.g. for GLUE tasks.
-    """,
-    BERT_START_DOCSTRING,
-)
-class BertForSequenceClassification(BertPreTrainedModel):
-    def __init__(self, config):
-        super().__init__(config)
-        self.num_labels = config.num_labels
+class BertClassifier(nn.Module):
+    def __init__(self, pretrain_path, num_labels=42, hidden_size=768):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.num_labels = num_labels
 
-        self.bert = BertModel(config)
+        # self.bert = BertModel(config)
+        print(f"loading model from pretrained: {pretrain_path}")
+        self.bert = BertModel.from_pretrained(pretrain_path)
         # self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.dropout = nn.Dropout()
-        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.classifier_mention_pooling = nn.Linear(config.hidden_size * 2, config.num_labels)
-        self.classifier_entity_start = nn.Linear(config.hidden_size * 2, config.num_labels)
+        self.classifier = nn.Linear(hidden_size, num_labels)
+        self.classifier_mention_pooling = nn.Linear(hidden_size * 2, num_labels)
+        self.classifier_entity_start = nn.Linear(hidden_size * 2, num_labels)
 
-        self.linear = nn.Linear(2 * config.hidden_size, 2 * config.hidden_size)
+        self.linear = nn.Linear(2 * hidden_size, 2 * hidden_size)
 
-        self.init_weights()
-
-    @add_start_docstrings_to_model_forward(BERT_INPUTS_DOCSTRING.format("batch_size, sequence_length"))
-    @add_code_sample_docstrings(
-        tokenizer_class=_TOKENIZER_FOR_DOC,
-        checkpoint="bert-base-uncased",
-        output_type=SequenceClassifierOutput,
-        config_class=_CONFIG_FOR_DOC,
-    )
     def forward(
         self,
         input_ids=None,

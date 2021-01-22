@@ -13,21 +13,21 @@ from transformers import BertTokenizer
 
 from utils import constant, helper
 
-def get_tokenizer(model_name):
+def get_tokenizer(pretrain_path):
     """
     Load or download BertTokenizer
     """
-    tokenizer_path = f"saved_models/{model_name}_tokenizer.pkl"
+    tokenizer_path = f"saved_models/{pretrain_path}_tokenizer.pkl"
     if os.path.isfile(tokenizer_path):
         # load from existing file
         tokenizer = pickle.load(open(tokenizer_path, 'rb'))
         print("Loaded tokenizer from saved path.")
     else:
         # download from pretrained
-        tokenizer = BertTokenizer.from_pretrained(model_name)
+        tokenizer = BertTokenizer.from_pretrained(pretrain_path)
         # save tokenizer
         pickle.dump(tokenizer, open(tokenizer_path, 'wb'))
-        print(f"Saved {model_name} tokenizer at {tokenizer_path}")
+        print(f"Saved {pretrain_path} tokenizer at {tokenizer_path}")
     # tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
 
     return tokenizer

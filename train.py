@@ -12,21 +12,22 @@ from shutil import copyfile
 import torch
 from torch import nn, optim
 from transformers import AdamW
-from model.bert import BertForSequenceClassification
+from model.bert import BertClassifier
 from matplotlib import pyplot as plt
 
 from dataset.loader import DataLoader, get_tokenizer
 from utils import scorer, constant, helper, torch_utils
 
+def set_seed(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.cuda.manual_seed(seed)
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir', type=str, default='dataset/tacred')
     parser.add_argument('--word_dropout', type=float, default=0.04, help='The rate at which randomly set a word to UNK.')
-    parser.add_argument('--topn', type=int, default=1e10, help='Only finetune top N embeddings.')
-    parser.add_argument('--lower', dest='lower', action='store_true', help='Lowercase all words.')
-    parser.add_argument('--no-lower', dest='lower', action='store_false')
-    parser.set_defaults(lower=False)
-    
     parser.add_argument('--lr', type=float, default=2e-5, help='Applies to SGD and Adagrad.')
     parser.add_argument('--optim', type=str, default='adamw', help='sgd, adam or adamw.')
     parser.add_argument('--num_epoch', type=int, default=10)
@@ -38,8 +39,6 @@ def parse_args():
     parser.add_argument('--save_dir', type=str, default='./saved_models', help='Root dir for saving models.')
     parser.add_argument('--id', type=str, default='test', help='Model ID under which to save models.')
     parser.add_argument('--info', type=str, default='', help='Optional info for the experiment.')
-
-    parser.add_argument('--seed', type=int, default=1234)
     return parser.parse_args()
 
 args = parse_args()
@@ -51,34 +50,32 @@ input_method = 3
 output_method = 3
 print(f"Input method: {input_method_name[input_method]}")
 print(f"Output method: {output_method_name[output_method]}")
-model_name = 'bert-base-uncased'
 
-grad_acc_steps = 64 // args.batch_size
-
-# seed
-torch.manual_seed(args.seed)
-np.random.seed(args.seed)
-random.seed(1234)
-torch.cuda.manual_seed(args.seed)
-
-# device
+# constants
+pretrain_path = 'bert-base-uncased'
 device = "cuda" if torch.cuda.is_available() else "cpu"
+id2label = dict([(v,k) for k,v in constant.LABEL_TO_ID.items()])
+max_steps = len(train_loader) * opt['num_epoch']
+lr = 2e-5
+weight_decay = 1e-5
+warmup_step = 300
+
+set_seed(1234)
 
 # make opt
 opt = vars(args)
-opt['num_class'] = len(constant.LABEL_TO_ID)
+opt['num_labels'] = len(constant.LABEL_TO_ID)
 
-# hyper parameters
-
+grad_acc_steps = 64 // args.batch_size
 
 # load data
-tokenizer = get_tokenizer(model_name)
+tokenizer = get_tokenizer(pretrain_path)
 print("Loading data from {} with batch size {}...".format(opt['data_dir'], opt['batch_size']))
 train_loader = DataLoader(opt['data_dir'] + '/train.json', opt['batch_size'], opt, tokenizer, evaluation=False, input_method=input_method)
 dev_loader = DataLoader(opt['data_dir'] + '/dev.json', opt['batch_size'], opt, tokenizer, evaluation=True, input_method=input_method)
 
-model_id = opt['id'] if len(opt['id']) > 1 else '0' + opt['id']
-model_save_dir = opt['save_dir'] + '/' + model_id
+# model dir
+model_save_dir = opt['save_dir'] + '/' + args.id
 opt['model_save_dir'] = model_save_dir
 helper.ensure_dir(model_save_dir, verbose=True)
 print("model_save_dir:", model_save_dir)
@@ -91,69 +88,17 @@ file_logger = helper.FileLogger(model_save_dir + '/' + opt['log'], header="# epo
 helper.print_config(opt)
 
 # model
-model = BertForSequenceClassification.from_pretrained(
-    model_name,
-    num_labels=len(constant.LABEL_TO_ID)
-)
-model.resize_token_embeddings(len(tokenizer))
+model = BertClassifier(pretrain_path, num_labels=opt['num_labels'])
+# model.resize_token_embeddings(len(tokenizer))
 model.to(device)
 
-# optimizer
-# optim = AdamW(model.parameters(), lr=3e-5)
-
-# Params and optimizer
-params = model.parameters()
-num_steps = len(train_loader) * opt['num_epoch']
-lr = 2e-5
-weight_decay = 1e-5
-warmup_step = 300
-batch_size = opt['batch_size']
-
-if opt['optim'] == 'sgd':
-    optimizer = optim.SGD(params, lr, weight_decay=weight_decay)
-elif opt['optim'] == 'adam':
-    optimizer = optim.Adam(params, lr, weight_decay=weight_decay)
-elif opt['optim'] == 'adamw': # Optimizer for BERT
-    from transformers import AdamW
-    params = list(model.named_parameters())
-    no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-    grouped_params = [
-        {
-            'params': [p for n, p in params if not any(nd in n for nd in no_decay)], 
-            'weight_decay': 0.01,
-            'lr': lr,
-            'ori_lr': lr
-        },
-        {
-            'params': [p for n, p in params if any(nd in n for nd in no_decay)], 
-            'weight_decay': 0.0,
-            'lr': lr,
-            'ori_lr': lr
-        }
-    ]
-    optimizer = AdamW(grouped_params, correct_bias=False)
-else:
-    raise Exception("Invalid optimizer. Must be 'sgd' or 'adam' or 'adamw'.")
-
-# Warmup
-if warmup_step > 0:
-    from transformers import get_linear_schedule_with_warmup
-    # print(len(train_loader))
-    training_steps = len(train_loader) * opt['num_epoch']
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_step, num_training_steps=training_steps)
-else:
-    scheduler = None
-
-
-# prepare for training
-id2label = dict([(v,k) for k,v in constant.LABEL_TO_ID.items()])
-dev_f1_history = []
-
+optimizer = torch_utils.get_optimizer(opt['optim'], model, lr, weight_decay)
+scheduler = torch_utils.get_scheduler(optimizer, max_steps, warmup_step)
 criterion = nn.CrossEntropyLoss()
+
 global_step = 0
 global_start_time = time.time()
 format_str = '{}: step {}/{} (epoch {}/{}), loss = {:.4f} ({:.3f} sec/batch)'
-max_steps = len(train_loader) * opt['num_epoch']
 
 list_train_loss = []
 list_dev_loss = []
@@ -198,6 +143,7 @@ for epoch in range(1, opt['num_epoch']+1):
             timestr = '{:%m-%d %H:%M:%S}'.format(datetime.now())
             print(format_str.format(timestr, global_step, max_steps, epoch,\
                     opt['num_epoch'], loss, duration))
+
         # optimize
         loss.backward()
         if (i + 1) % grad_acc_steps == 0: # gradient accumulation
@@ -246,24 +192,25 @@ for epoch in range(1, opt['num_epoch']+1):
         predictions = [id2label[p] for p in predictions]
         dev_p, dev_r, dev_f1 = scorer.score(dev_loader.gold(), predictions)
         
-        train_loss = train_loss / train_loader.num_examples * opt['batch_size'] # avg loss per batch
+        # log avg loss per batch
+        train_loss = train_loss / train_loader.num_examples * opt['batch_size']
         dev_loss = dev_loss / dev_loader.num_examples * opt['batch_size']
         print("epoch {}: train_loss = {:.6f}, dev_loss = {:.6f}, dev_f1 = {:.4f}".format(epoch,\
                 train_loss, dev_loss, dev_f1))
         file_logger.log("{}\t{:.6f}\t{:.6f}\t{:.4f}".format(epoch, train_loss, dev_loss, dev_f1))
 
         # save
-        model_file = model_save_dir + '/checkpoint_epoch_{}.pt'.format(epoch)
+        model_file = model_save_dir + '/ckpt_epoch_{}.pt'.format(epoch)
         # model.save(model_file, epoch)
         # torch_utils.save(model, optim, opt, filename=model_file)
         torch.save({'state_dict': model.state_dict()}, model_file)
-        if len(dev_f1_history) == 0 or dev_f1 > max(dev_f1_history):
+        if len(list_dev_f1) == 0 or dev_f1 > max(list_dev_f1):
             copyfile(model_file, model_save_dir + '/best_model.pt')
             print("new best model saved.")
         if epoch % opt['save_epoch'] != 0:
             os.remove(model_file)
 
-        dev_f1_history.append(dev_f1)
+        list_dev_f1.append(dev_f1)
         print("")
 
         # plot and save figure

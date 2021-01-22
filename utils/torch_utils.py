@@ -90,19 +90,43 @@ class MyAdagrad(Optimizer):
         return loss
 
 ### torch specific functions
-def get_optimizer(name, parameters, lr):
+def get_optimizer(name, model, lr, weight_decay):
     if name == 'sgd':
-        return torch.optim.SGD(parameters, lr=lr)
-    elif name in ['adagrad', 'myadagrad']:
-        # use my own adagrad to allow for init accumulator value
-        return MyAdagrad(parameters, lr=lr, init_accu_value=0.1)
+        optimizer = optim.SGD(model.parameters(), lr, weight_decay=weight_decay)
     elif name == 'adam':
-        return torch.optim.Adam(parameters, betas=(0.9, 0.99)) # use default lr
-    elif name == 'adamax':
-        return torch.optim.Adamax(parameters) # use default lr
+        optimizer = optim.Adam(model.parameters(), lr, weight_decay=weight_decay)
+    elif name == 'adamw': # Optimizer for BERT
+        from transformers import AdamW
+        params = list(model.named_parameters())
+        no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+        grouped_params = [
+            {
+                'params': [p for n, p in params if not any(nd in n for nd in no_decay)], 
+                'weight_decay': 0.01,
+                'lr': lr,
+                'ori_lr': lr
+            },
+            {
+                'params': [p for n, p in params if any(nd in n for nd in no_decay)], 
+                'weight_decay': 0.0,
+                'lr': lr,
+                'ori_lr': lr
+            }
+        ]
+        optimizer = AdamW(grouped_params, correct_bias=False)
     else:
-        raise Exception("Unsupported optimizer: {}".format(name))
+        raise Exception("Invalid optimizer. Must be 'sgd' or 'adam' or 'adamw'.")
+    return optimizer
 
+def get_scheduler(optimizer, num_train_steps, warmup_step):
+    if warmup_step > 0:
+        from transformers import get_linear_schedule_with_warmup
+        return get_linear_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=warmup_step,
+            num_training_steps=num_train_steps)
+    return None
+    
 def change_lr(optimizer, new_lr):
     for param_group in optimizer.param_groups:
         param_group['lr'] = new_lr
