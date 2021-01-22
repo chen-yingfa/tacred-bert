@@ -136,7 +136,8 @@ def main():
     # print model info
     helper.print_config(opt)
 
-    train_steps = len(train_loader) // opt['batch_size'] * opt['num_epoch']
+    # train_steps = len(train_loader) // opt['batch_size'] * opt['num_epoch']
+    train_steps = len(train_loader) * opt['num_epoch']
 
     optimizer = torch_utils.get_optimizer(opt['optim'], model, lr, weight_decay)
     scheduler = torch_utils.get_scheduler(optimizer, train_steps, warmup_step)
