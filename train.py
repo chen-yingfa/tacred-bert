@@ -57,6 +57,7 @@ def main():
     # constants
     pretrain_path = 'bert-base-uncased'
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    print("device:", device)
     # device = "cpu"
     id2label = dict([(v,k) for k,v in constant.LABEL_TO_ID.items()])
     lr = 2e-5
