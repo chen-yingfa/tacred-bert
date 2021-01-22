@@ -1,7 +1,8 @@
 import torch
 from torch import nn
 
-from .bert import BertModel
+# from .bert import BertModel
+from transformers import BertModel
 
 
 class BertClassifier(nn.Module):
@@ -27,18 +28,28 @@ class BertClassifier(nn.Module):
     def forward(
         self,
         input_ids=None,
-        attention_mask=None,
+        att_mask=None,
         e1_pos=None,
         e2_pos=None,
         e1_pos_seq=None,
         e2_pos_seq=None,
         output_method=None,
     ):
+
+        # print("input_ids:", input_ids)
+        # print(input_ids.shape)
+        # print("att_mask:", att_mask)
+        # print(att_mask.shape)
+        # print("e1_pos:", e1_pos)
+        # print(e1_pos.shape)
+        # print("e2_pos:", e2_pos)
+        # print(e2_pos.shape)
+
         outputs = self.bert(
             input_ids,
-            attention_mask=attention_mask,
-            e1_pos_seq=e1_pos_seq,
-            e2_pos_seq=e2_pos_seq,
+            attention_mask=att_mask,
+            # e1_pos_seq=e1_pos_seq,
+            # e2_pos_seq=e2_pos_seq,
         )
 
         # Method 1, [CLS] token (default)
@@ -89,27 +100,23 @@ class BertClassifier(nn.Module):
 
             # BEGIN
             # NEW
-
-            # print("e1_pos:", e1_pos)
-            # print("e2_pos:", e2_pos)
-
             # Get entity start hidden state
-            # print(hidden_states.size())
+            # print("hidden_states:", hidden_states)
+            # print(hidden_states.shape)
             onehot1 = torch.zeros(hidden_states.size()[:2]).float().to(input_ids.device)  # (B, L)
             onehot2 = torch.zeros(hidden_states.size()[:2]).float().to(input_ids.device)  # (B, L)
             onehot1 = onehot1.scatter_(1, e1_pos, 1)
             onehot2 = onehot2.scatter_(1, e2_pos, 1)
-            # print("onehot1:", onehot1)
-            # print("onehot2:", onehot2)
-
             hidden1 = (onehot1.unsqueeze(2) * hidden_states).sum(1)  # (B, H)
             hidden2 = (onehot2.unsqueeze(2) * hidden_states).sum(1)  # (B, H)
-            # print("hidden1:", hidden1)
-            # print("hidden2:", hidden2)
-            # print("hidden1.shape:", hidden1.shape)
-            # print("hidden2.shape:", hidden2.shape)
             x = torch.cat([hidden1, hidden2], 1)
-            # print(x)
+            # print("hidden1:", hidden1)
+            # print(hidden1.shape)
+            # print("hidden2:", hidden2)
+            # print(hidden2.shape)
+            # print("x:", x)
+            # print(x.shape)
+            # exit(0)
 
             # OLD
 
