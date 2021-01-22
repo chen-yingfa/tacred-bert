@@ -93,7 +93,7 @@ def main():
         constant.LABEL_TO_ID,
         model.tokenize,
         opt['batch_size'],
-        False)
+        True)
     dev_loader = REDataLoader(
         opt['data_dir'] + '/dev.json',
         constant.LABEL_TO_ID,
