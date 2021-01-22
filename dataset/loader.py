@@ -36,7 +36,7 @@ class DataLoader(object):
     """
     Load data from json files, preprocess and prepare batches.
     """
-    def __init__(self, filename, batch_size, opt, tokenizer=None, evaluation=False, input_method=None):
+    def __init__(self, filename, batch_size, opt, tokenizer=None, evaluation=False, input_method=None, lower_case ):
         self.batch_size = batch_size
         self.opt = opt
         if tokenizer is None:
@@ -74,8 +74,7 @@ class DataLoader(object):
         processed = []
         for d in data:
             tokens = d['token']
-            if self.opt['lower']:
-                tokens = [t.lower() for t in tokens]
+            # tokens = [t.lower() for t in tokens]
             # anonymize tokens
             ss, se = d['subj_start'], d['subj_end']
             os, oe = d['obj_start'], d['obj_end']
