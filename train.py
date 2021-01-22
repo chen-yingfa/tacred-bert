@@ -58,7 +58,6 @@ def main():
     pretrain_path = 'bert-base-uncased'
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("device:", device)
-    # device = "cpu"
     id2label = dict([(v,k) for k,v in constant.LABEL_TO_ID.items()])
     lr = 2e-5
     weight_decay = 1e-5
@@ -166,21 +165,10 @@ def main():
                 e1_pos_seq = e1_pos_seq.to(device)
                 e2_pos_seq = e2_pos_seq.to(device)
 
-            # print("input_ids:", input_ids)
-            # print(input_ids.shape)
-            # print("att_mask:", att_mask)
-            # print(att_mask.shape)
-            # print("e1_pos:", e1_pos)
-            # print(e1_pos.shape)
-            # print("e2_pos:", e2_pos)
-            # print(e2_pos.shape)
-
-            # exit(0)
-
             # pass to model
             logits = model(
                 input_ids,
-                attention_mask=att_mask,
+                att_mask=att_mask,
                 e1_pos=e1_pos,
                 e2_pos=e2_pos,
                 # e1_pos_seq=e1_pos_seq,
@@ -231,7 +219,7 @@ def main():
                 # pass to model
                 logits = model(
                     input_ids,
-                    attention_mask=att_mask,
+                    att_mask=att_mask,
                     e1_pos=e1_pos,
                     e2_pos=e2_pos,
                     # e1_pos_seq=e1_pos_seq,

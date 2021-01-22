@@ -52,8 +52,10 @@ class REDataset(Dataset):
                 Make sure that the `shuffle` param is set to `False` when getting the loader.
             use_name: if True, `preds` contains predicted relation names instead of ids
         Return:
-            F1-score
+            {'acc': acc, 'micro_r': micro_r, 'micro_p': micro_p, 'micro_f1': micro_f1}
         """
+        print("preds:", preds[:36])
+        print("gold:", [d['relation'] for d in self.data][:36])
         correct = 0
         total = len(self.data)
         correct_positive = 0
