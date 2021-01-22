@@ -54,8 +54,8 @@ class REDataset(Dataset):
         Return:
             {'acc': acc, 'micro_r': micro_r, 'micro_p': micro_p, 'micro_f1': micro_f1}
         """
-        print("preds:", preds[:36])
-        print("gold:", [d['relation'] for d in self.data][:36])
+        # print("preds:", preds[:36])
+        # print("gold:", [d['relation'] for d in self.data][:36])
         correct = 0
         total = len(self.data)
         correct_positive = 0

@@ -151,9 +151,6 @@ def main():
     list_dev_loss = []
     list_dev_f1 = []
 
-    print(list(model.parameters())[0])
-    print(list(model.parameters())[-1])
-
     # start training
     for epoch in range(1, opt['num_epoch']+1):
         train_loss = 0
@@ -202,11 +199,6 @@ def main():
             loss.backward()
             # if (i + 1) % grad_acc_steps == 0: # gradient accumulation
 
-            # for param in model.parameters():
-            #     print(param.grad.data.sum())
-
-            # exit(0)
-
             optimizer.step()
             if scheduler is not None:
                 scheduler.step()
@@ -214,8 +206,6 @@ def main():
             train_loss += loss
             global_step += 1
         
-        print(list(model.parameters())[0])
-        print(list(model.parameters())[-1])
 
         # eval on dev
         print("Evaluating on dev set...")
