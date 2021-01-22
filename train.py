@@ -55,7 +55,6 @@ print(f"Output method: {output_method_name[output_method]}")
 pretrain_path = 'bert-base-uncased'
 device = "cuda" if torch.cuda.is_available() else "cpu"
 id2label = dict([(v,k) for k,v in constant.LABEL_TO_ID.items()])
-max_steps = len(train_loader) * opt['num_epoch']
 lr = 2e-5
 weight_decay = 1e-5
 warmup_step = 300
@@ -92,6 +91,7 @@ model = BertClassifier(pretrain_path, num_labels=opt['num_labels'])
 # model.resize_token_embeddings(len(tokenizer))
 model.to(device)
 
+max_steps = len(train_loader) * opt['num_epoch']
 optimizer = torch_utils.get_optimizer(opt['optim'], model, lr, weight_decay)
 scheduler = torch_utils.get_scheduler(optimizer, max_steps, warmup_step)
 criterion = nn.CrossEntropyLoss()
