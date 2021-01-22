@@ -226,6 +226,9 @@ def main():
                     # e1_pos_seq=e1_pos_seq,
                     # e2_pos_seq=e2_pos_seq,
                     output_method=output_method)
+                
+                if i == 0:
+                    print("logits[:4]:", logits[:4])
 
                 # logits = outputs.logits
                 loss = criterion(logits, labels)
