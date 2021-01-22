@@ -188,11 +188,12 @@ def main():
 
             # optimize
             loss.backward()
-            if (i + 1) % grad_acc_steps == 0: # gradient accumulation
-                optimizer.step()
-                optimizer.zero_grad()
-                if scheduler is not None:
-                    scheduler.step()
+            # if (i + 1) % grad_acc_steps == 0: # gradient accumulation
+            optimizer.step()
+            if scheduler is not None:
+                scheduler.step()
+            optimizer.zero_grad()
+            
             train_loss += loss
             global_step += 1
 
