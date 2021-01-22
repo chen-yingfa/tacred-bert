@@ -20,10 +20,11 @@ from dataset.dataset import REDataLoader
 from utils import scorer, constant, helper, torch_utils
 
 def set_seed(seed):
+    torch.cuda.manual_seed(seed)
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
-    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic=True
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -64,7 +65,7 @@ def main():
     warmup_step = 300
     max_length = 128
 
-    set_seed(1234)
+    set_seed(12345)
 
     # make opt
     opt = vars(args)
@@ -87,7 +88,7 @@ def main():
         constant.LABEL_TO_ID,
         model.tokenize,
         opt['batch_size'],
-        True)
+        False)
     dev_loader = REDataLoader(
         opt['data_dir'] + '/dev.json',
         constant.LABEL_TO_ID,

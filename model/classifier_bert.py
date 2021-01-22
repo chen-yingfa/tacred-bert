@@ -103,32 +103,36 @@ class BertClassifier(nn.Module):
             # Get entity start hidden state
             # print("hidden_states:", hidden_states)
             # print(hidden_states.shape)
-            onehot1 = torch.zeros(hidden_states.size()[:2]).float().to(input_ids.device)  # (B, L)
-            onehot2 = torch.zeros(hidden_states.size()[:2]).float().to(input_ids.device)  # (B, L)
-            onehot1 = onehot1.scatter_(1, e1_pos, 1)
-            onehot2 = onehot2.scatter_(1, e2_pos, 1)
-            hidden1 = (onehot1.unsqueeze(2) * hidden_states).sum(1)  # (B, H)
-            hidden2 = (onehot2.unsqueeze(2) * hidden_states).sum(1)  # (B, H)
-            x = torch.cat([hidden1, hidden2], 1)
+            # onehot1 = torch.zeros(hidden_states.size()[:2]).float().to(input_ids.device)  # (B, L)
+            # onehot2 = torch.zeros(hidden_states.size()[:2]).float().to(input_ids.device)  # (B, L)
+            # onehot1 = onehot1.scatter_(1, e1_pos, 1)
+            # onehot2 = onehot2.scatter_(1, e2_pos, 1)
+            # hidden1 = (onehot1.unsqueeze(2) * hidden_states).sum(1)  # (B, H)
+            # hidden2 = (onehot2.unsqueeze(2) * hidden_states).sum(1)  # (B, H)
+            # x = torch.cat([hidden1, hidden2], 1)
             # print("hidden1:", hidden1)
             # print(hidden1.shape)
             # print("hidden2:", hidden2)
             # print(hidden2.shape)
-            # print("x:", x)
-            # print(x.shape)
-            # exit(0)
 
             # OLD
 
-            # e1_start_index = e1_pos[range(batch_size), 0]
-            # e2_start_index = e2_pos[range(batch_size), 0]
-            # e1_start_embed = hidden_states[range(batch_size), e1_start_index]
-            # e2_start_embed = hidden_states[range(batch_size), e2_start_index]
-            # x = torch.cat((e1_start_embed, e2_start_embed), 1)
+            e1_start_index = e1_pos[range(batch_size), 0]
+            e2_start_index = e2_pos[range(batch_size), 0]
+            e1_start_embed = hidden_states[range(batch_size), e1_start_index]
+            e2_start_embed = hidden_states[range(batch_size), e2_start_index]
+            x = torch.cat((e1_start_embed, e2_start_embed), 1)
             
+            # print("hidden1:", e1_start_embed)
+            # print(e1_start_embed.shape)
+            # print("hidden2:", e2_start_embed)
+            # print(e2_start_embed.shape)
+
             # classify
-            
+            # print("x:", x)
             # print(x.shape)
+            # exit(0)
+            
             x = self.linear(x)
             x = self.dropout(x)
             logits = self.classifier_entity_start(x)
