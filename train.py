@@ -27,7 +27,7 @@ def set_seed(seed):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', type=str, default='dataset/tacred-example')
+    parser.add_argument('--data_dir', type=str, default='dataset/tacred')
     parser.add_argument('--word_dropout', type=float, default=0.04, help='The rate at which randomly set a word to UNK.')
     parser.add_argument('--lr', type=float, default=2e-5, help='Applies to SGD and Adagrad.')
     parser.add_argument('--optim', type=str, default='adamw', help='sgd, adam or adamw.')
