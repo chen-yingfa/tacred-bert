@@ -59,7 +59,7 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("device:", device)
     id2label = dict([(v,k) for k,v in constant.LABEL_TO_ID.items()])
-    lr = 2e-5
+    lr = args.lr
     weight_decay = 1e-5
     warmup_step = 300
     max_length = 128
