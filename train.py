@@ -12,7 +12,8 @@ from shutil import copyfile
 import torch
 from torch import nn, optim
 from transformers import AdamW
-from model.classifier_bert import BertClassifier
+# from model.classifier_bert import BertClassifier
+from model.bert import BertClassifier
 from matplotlib import pyplot as plt
 
 from dataset.loader import DataLoader, get_tokenizer
@@ -28,10 +29,10 @@ def set_seed(seed):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', type=str, default='dataset/tacred')
+    parser.add_argument('--data_dir', type=str, default='dataset/tacred-small')
     parser.add_argument('--word_dropout', type=float, default=0.04, help='The rate at which randomly set a word to UNK.')
-    parser.add_argument('--lr', type=float, default=2e-5, help='Applies to SGD and Adagrad.')
-    parser.add_argument('--optim', type=str, default='adamw', help='sgd, adam or adamw.')
+    parser.add_argument('--lr', type=float, default=2e-1, help='Applies to SGD and Adagrad.')
+    parser.add_argument('--optim', type=str, default='sgd', help='sgd, adam or adamw.')
     parser.add_argument('--num_epoch', type=int, default=16)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--max_grad_norm', type=float, default=5.0, help='Gradient clipping.')
@@ -102,7 +103,7 @@ def main():
         opt['batch_size'],
         False)
 
-    # load data
+    # # load data
     # print("Loading data from {} with batch size {}...".format(opt['data_dir'], opt['batch_size']))
     # train_loader = DataLoader(opt['data_dir'] + '/train.json',
     #     opt['batch_size'], 
@@ -145,15 +146,18 @@ def main():
     list_dev_loss = []
     list_dev_f1 = []
 
+    print(list(model.parameters())[0])
+    print(list(model.parameters())[-1])
+
     # start training
     for epoch in range(1, opt['num_epoch']+1):
         train_loss = 0
         model.train()
         for i, batch in enumerate(train_loader):
+            optimizer.zero_grad()
             start_time = time.time()
 
             # labels, input_ids, att_mask, e1_pos, e2_pos, e1_pos_seq, e2_pos_seq = batch
-            # print(batch)
             labels, input_ids, att_mask, e1_pos, e2_pos = batch
 
             # change device
@@ -187,16 +191,26 @@ def main():
                 print(format_str.format(timestr, global_step, train_steps, epoch,\
                         opt['num_epoch'], loss, duration))
 
+
+
             # optimize
             loss.backward()
             # if (i + 1) % grad_acc_steps == 0: # gradient accumulation
+
+            # for param in model.parameters():
+            #     print(param.grad.data.sum())
+
+            # exit(0)
+
             optimizer.step()
             if scheduler is not None:
                 scheduler.step()
-            optimizer.zero_grad()
             
             train_loss += loss
             global_step += 1
+        
+        print(list(model.parameters())[0])
+        print(list(model.parameters())[-1])
 
         # eval on dev
         print("Evaluating on dev set...")
@@ -243,9 +257,12 @@ def main():
             dev_p = result['micro_p']
             dev_r = result['micro_r']
             dev_f1 = result['micro_f1']
+
             # log avg loss per batch
             train_loss = train_loss / len(train_loader.dataset) * opt['batch_size']
             dev_loss = dev_loss / len(dev_loader.dataset) * opt['batch_size']
+            # train_loss = train_loss / train_loader.num_examples * opt['batch_size']
+            # dev_loss = dev_loss / dev_loader.num_examples * opt['batch_size']
             print("epoch {}: train_loss = {:.6f}, dev_loss = {:.6f}, dev_f1 = {:.4f}".format(epoch,\
                     train_loss, dev_loss, dev_f1))
             file_logger.log("{}\t{:.6f}\t{:.6f}\t{:.4f}".format(epoch, train_loss, dev_loss, dev_f1))
