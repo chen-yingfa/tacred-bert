@@ -42,177 +42,117 @@ def parse_args():
     parser.add_argument('--info', type=str, default='', help='Optional info for the experiment.')
     return parser.parse_args()
 
-args = parse_args()
 
-# method
-input_method_name = ["", "standard", "positional_embedding", "entity_markers"]
-output_method_name = ["", "cls_token", "mention_pooling", "entity_start"]
-input_method = 3
-output_method = 3
-print(f"Input method: {input_method_name[input_method]}")
-print(f"Output method: {output_method_name[output_method]}")
+def main():
+    args = parse_args()
 
-# constants
-pretrain_path = 'bert-base-uncased'
-device = "cuda" if torch.cuda.is_available() else "cpu"
-device = "cpu"
-id2label = dict([(v,k) for k,v in constant.LABEL_TO_ID.items()])
-lr = 2e-5
-weight_decay = 1e-5
-warmup_step = 300
-max_length = 128
+    # method
+    input_method_name = ["", "standard", "positional_embedding", "entity_markers"]
+    output_method_name = ["", "cls_token", "mention_pooling", "entity_start"]
+    input_method = 3
+    output_method = 3
+    print(f"Input method: {input_method_name[input_method]}")
+    print(f"Output method: {output_method_name[output_method]}")
 
-set_seed(1234)
+    # constants
+    pretrain_path = 'bert-base-uncased'
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # device = "cpu"
+    id2label = dict([(v,k) for k,v in constant.LABEL_TO_ID.items()])
+    lr = 2e-5
+    weight_decay = 1e-5
+    warmup_step = 300
+    max_length = 128
 
-# make opt
-opt = vars(args)
-opt['num_labels'] = len(constant.LABEL_TO_ID)
+    set_seed(1234)
 
-grad_acc_steps = 64 // args.batch_size
+    # make opt
+    opt = vars(args)
+    opt['num_labels'] = len(constant.LABEL_TO_ID)
 
-# model
-tokenizer = get_tokenizer(pretrain_path)
-model = BertClassifier(
-    pretrain_path,
-    tokenizer,
-    max_length=max_length,
-    num_labels=len(id2label))
-model.to(device)
+    grad_acc_steps = 64 // args.batch_size
 
-# data loader
-train_loader = REDataLoader(
-    opt['data_dir'] + '/train.json',
-    constant.LABEL_TO_ID,
-    model.tokenize,
-    opt['batch_size'],
-    True)
-dev_loader = REDataLoader(
-    opt['data_dir'] + '/dev.json',
-    constant.LABEL_TO_ID,
-    model.tokenize,
-    opt['batch_size'],
-    False)
-test_loader = REDataLoader(
-    opt['data_dir'] + '/test.json',
-    constant.LABEL_TO_ID,
-    model.tokenize,
-    opt['batch_size'],
-    False)
+    # model
+    tokenizer = get_tokenizer(pretrain_path)
+    model = BertClassifier(
+        pretrain_path,
+        tokenizer,
+        max_length=max_length,
+        num_labels=len(id2label))
+    model.to(device)
 
-# load data
-# print("Loading data from {} with batch size {}...".format(opt['data_dir'], opt['batch_size']))
-# train_loader = DataLoader(opt['data_dir'] + '/train.json',
-#     opt['batch_size'], 
-#     opt,
-#     tokenizer=tokenizer,
-#     evaluation=False,
-#     input_method=input_method)
-# dev_loader = DataLoader(
-#     opt['data_dir'] + '/dev.json',
-#     opt['batch_size'],
-#     opt,
-#     tokenizer=tokenizer,
-#     evaluation=True,
-#     input_method=input_method)
+    # data loader
+    train_loader = REDataLoader(
+        opt['data_dir'] + '/train.json',
+        constant.LABEL_TO_ID,
+        model.tokenize,
+        opt['batch_size'],
+        True)
+    dev_loader = REDataLoader(
+        opt['data_dir'] + '/dev.json',
+        constant.LABEL_TO_ID,
+        model.tokenize,
+        opt['batch_size'],
+        False)
+    test_loader = REDataLoader(
+        opt['data_dir'] + '/test.json',
+        constant.LABEL_TO_ID,
+        model.tokenize,
+        opt['batch_size'],
+        False)
 
-# model dir
-model_save_dir = opt['save_dir'] + '/' + args.id
-opt['model_save_dir'] = model_save_dir
-helper.ensure_dir(model_save_dir, verbose=True)
-print("model_save_dir:", model_save_dir)
+    # load data
+    # print("Loading data from {} with batch size {}...".format(opt['data_dir'], opt['batch_size']))
+    # train_loader = DataLoader(opt['data_dir'] + '/train.json',
+    #     opt['batch_size'], 
+    #     opt,
+    #     tokenizer=tokenizer,
+    #     evaluation=False,
+    #     input_method=input_method)
+    # dev_loader = DataLoader(
+    #     opt['data_dir'] + '/dev.json',
+    #     opt['batch_size'],
+    #     opt,
+    #     tokenizer=tokenizer,
+    #     evaluation=True,
+    #     input_method=input_method)
 
-# save config
-helper.save_config(opt, model_save_dir + '/config.json', verbose=True)
-file_logger = helper.FileLogger(model_save_dir + '/' + opt['log'], header="# epoch\ttrain_loss\tdev_loss\tdev_f1")
+    # model dir
+    model_save_dir = opt['save_dir'] + '/' + args.id
+    opt['model_save_dir'] = model_save_dir
+    helper.ensure_dir(model_save_dir, verbose=True)
+    print("model_save_dir:", model_save_dir)
 
-# print model info
-helper.print_config(opt)
+    # save config
+    helper.save_config(opt, model_save_dir + '/config.json', verbose=True)
+    file_logger = helper.FileLogger(model_save_dir + '/' + opt['log'], header="# epoch\ttrain_loss\tdev_loss\tdev_f1")
 
-train_steps = len(train_loader) // opt['batch_size'] * opt['num_epoch']
+    # print model info
+    helper.print_config(opt)
 
-optimizer = torch_utils.get_optimizer(opt['optim'], model, lr, weight_decay)
-scheduler = torch_utils.get_scheduler(optimizer, train_steps, warmup_step)
-criterion = nn.CrossEntropyLoss()
+    train_steps = len(train_loader) // opt['batch_size'] * opt['num_epoch']
 
-global_step = 0
-global_start_time = time.time()
-format_str = '{}: step {}/{} (epoch {}/{}), loss = {:.4f} ({:.3f} sec/batch)'
+    optimizer = torch_utils.get_optimizer(opt['optim'], model, lr, weight_decay)
+    scheduler = torch_utils.get_scheduler(optimizer, train_steps, warmup_step)
+    criterion = nn.CrossEntropyLoss()
 
-list_train_loss = []
-list_dev_loss = []
-list_dev_f1 = []
+    global_step = 0
+    global_start_time = time.time()
+    format_str = '{}: step {}/{} (epoch {}/{}), loss = {:.4f} ({:.3f} sec/batch)'
 
-# start training
-for epoch in range(1, opt['num_epoch']+1):
-    train_loss = 0
-    model.train()
-    for i, batch in enumerate(train_loader):
-        start_time = time.time()
+    list_train_loss = []
+    list_dev_loss = []
+    list_dev_f1 = []
 
-        # labels, input_ids, att_mask, e1_pos, e2_pos, e1_pos_seq, e2_pos_seq = batch
-        # print(batch)
-        labels, input_ids, att_mask, e1_pos, e2_pos = batch
+    # start training
+    for epoch in range(1, opt['num_epoch']+1):
+        train_loss = 0
+        model.train()
+        for i, batch in enumerate(train_loader):
+            start_time = time.time()
 
-        # change device
-        labels = labels.to(device)
-        input_ids = input_ids.to(device)
-        att_mask = att_mask.to(device)
-        e1_pos = e1_pos.to(device)
-        e2_pos = e2_pos.to(device)
-        if input_method == 2:
-            e1_pos_seq = e1_pos_seq.to(device)
-            e2_pos_seq = e2_pos_seq.to(device)
-
-        # print("input_ids:", input_ids)
-        # print(input_ids.shape)
-        # print("att_mask:", att_mask)
-        # print(att_mask.shape)
-        # print("e1_pos:", e1_pos)
-        # print(e1_pos.shape)
-        # print("e2_pos:", e2_pos)
-        # print(e2_pos.shape)
-
-        # exit(0)
-
-        # pass to model
-        logits = model(
-            input_ids,
-            attention_mask=att_mask,
-            e1_pos=e1_pos,
-            e2_pos=e2_pos,
-            # e1_pos_seq=e1_pos_seq,
-            # e2_pos_seq=e2_pos_seq,
-            output_method=output_method)
-
-        # print(logits)
-
-        loss = criterion(logits, labels)
-
-        # log
-        if global_step % opt['log_step'] == 0:
-            duration = time.time() - start_time
-            timestr = '{:%m-%d %H:%M:%S}'.format(datetime.now())
-            print(format_str.format(timestr, global_step, train_steps, epoch,\
-                    opt['num_epoch'], loss, duration))
-
-        # optimize
-        loss.backward()
-        if (i + 1) % grad_acc_steps == 0: # gradient accumulation
-            optimizer.step()
-            optimizer.zero_grad()
-            if scheduler is not None:
-                scheduler.step()
-        train_loss += loss
-        global_step += 1
-
-    # eval on dev
-    print("Evaluating on dev set...")
-    predictions = []
-    dev_loss = 0
-    model.eval()
-    with torch.no_grad():
-        for i, batch in enumerate(dev_loader):
             # labels, input_ids, att_mask, e1_pos, e2_pos, e1_pos_seq, e2_pos_seq = batch
+            # print(batch)
             labels, input_ids, att_mask, e1_pos, e2_pos = batch
 
             # change device
@@ -224,7 +164,18 @@ for epoch in range(1, opt['num_epoch']+1):
             if input_method == 2:
                 e1_pos_seq = e1_pos_seq.to(device)
                 e2_pos_seq = e2_pos_seq.to(device)
-            
+
+            # print("input_ids:", input_ids)
+            # print(input_ids.shape)
+            # print("att_mask:", att_mask)
+            # print(att_mask.shape)
+            # print("e1_pos:", e1_pos)
+            # print(e1_pos.shape)
+            # print("e2_pos:", e2_pos)
+            # print(e2_pos.shape)
+
+            # exit(0)
+
             # pass to model
             logits = model(
                 input_ids,
@@ -235,50 +186,105 @@ for epoch in range(1, opt['num_epoch']+1):
                 # e2_pos_seq=e2_pos_seq,
                 output_method=output_method)
 
-            # logits = outputs.logits
+            # print(logits)
+
             loss = criterion(logits, labels)
-            preds = torch.argmax(logits, dim=1).cpu().tolist()
 
-            predictions += preds
-            dev_loss += loss
-        predictions = [id2label[p] for p in predictions]
-        # dev_p, dev_r, dev_f1 = scorer.score(dev_loader.gold(), predictions)
-        result = dev_loader.dataset.eval(predictions, True)
-        dev_p = result['micro_p']
-        dev_r = result['micro_r']
-        dev_f1 = result['micro_f1']
-        # log avg loss per batch
-        train_loss = train_loss / len(train_loader.dataset) * opt['batch_size']
-        dev_loss = dev_loss / len(dev_loader.dataset) * opt['batch_size']
-        print("epoch {}: train_loss = {:.6f}, dev_loss = {:.6f}, dev_f1 = {:.4f}".format(epoch,\
-                train_loss, dev_loss, dev_f1))
-        file_logger.log("{}\t{:.6f}\t{:.6f}\t{:.4f}".format(epoch, train_loss, dev_loss, dev_f1))
+            # log
+            if global_step % opt['log_step'] == 0:
+                duration = time.time() - start_time
+                timestr = '{:%m-%d %H:%M:%S}'.format(datetime.now())
+                print(format_str.format(timestr, global_step, train_steps, epoch,\
+                        opt['num_epoch'], loss, duration))
 
-        # save
-        model_file = model_save_dir + '/ckpt_epoch_{}.pt'.format(epoch)
-        # model.save(model_file, epoch)
-        # torch_utils.save(model, optim, opt, filename=model_file)
-        torch.save({'state_dict': model.state_dict()}, model_file)
-        if len(list_dev_f1) == 0 or dev_f1 > max(list_dev_f1):
-            copyfile(model_file, model_save_dir + '/best_model.pt')
-            print("new best model saved.")
-        if epoch % opt['save_epoch'] != 0:
-            os.remove(model_file)
+            # optimize
+            loss.backward()
+            if (i + 1) % grad_acc_steps == 0: # gradient accumulation
+                optimizer.step()
+                optimizer.zero_grad()
+                if scheduler is not None:
+                    scheduler.step()
+            train_loss += loss
+            global_step += 1
 
-        list_dev_f1.append(dev_f1)
-        print("")
+        # eval on dev
+        print("Evaluating on dev set...")
+        predictions = []
+        dev_loss = 0
+        model.eval()
+        with torch.no_grad():
+            for i, batch in enumerate(dev_loader):
+                # labels, input_ids, att_mask, e1_pos, e2_pos, e1_pos_seq, e2_pos_seq = batch
+                labels, input_ids, att_mask, e1_pos, e2_pos = batch
 
-        # plot and save figure
-        list_train_loss.append(train_loss)
-        list_dev_loss.append(dev_loss)
-        list_dev_f1.append(dev_f1)
-        plt.xlabel("epoch")
-        plt.plot(list_train_loss, label="train loss")
-        plt.plot(list_dev_loss, label="val loss")
-        plt.plot(list_dev_f1, label="dev f1")
-        plt.legend()
-        plt.savefig(model_save_dir + '/loss_f1_vs_epoch.png')
-        plt.clf()
-        plt.close()
+                # change device
+                labels = labels.to(device)
+                input_ids = input_ids.to(device)
+                att_mask = att_mask.to(device)
+                e1_pos = e1_pos.to(device)
+                e2_pos = e2_pos.to(device)
+                if input_method == 2:
+                    e1_pos_seq = e1_pos_seq.to(device)
+                    e2_pos_seq = e2_pos_seq.to(device)
+                
+                # pass to model
+                logits = model(
+                    input_ids,
+                    attention_mask=att_mask,
+                    e1_pos=e1_pos,
+                    e2_pos=e2_pos,
+                    # e1_pos_seq=e1_pos_seq,
+                    # e2_pos_seq=e2_pos_seq,
+                    output_method=output_method)
 
-print("Training ended with {} epochs.".format(epoch))
+                # logits = outputs.logits
+                loss = criterion(logits, labels)
+                preds = torch.argmax(logits, dim=1).cpu().tolist()
+
+                predictions += preds
+                dev_loss += loss
+            predictions = [id2label[p] for p in predictions]
+            # dev_p, dev_r, dev_f1 = scorer.score(dev_loader.gold(), predictions)
+            result = dev_loader.dataset.eval(predictions, True)
+            dev_p = result['micro_p']
+            dev_r = result['micro_r']
+            dev_f1 = result['micro_f1']
+            # log avg loss per batch
+            train_loss = train_loss / len(train_loader.dataset) * opt['batch_size']
+            dev_loss = dev_loss / len(dev_loader.dataset) * opt['batch_size']
+            print("epoch {}: train_loss = {:.6f}, dev_loss = {:.6f}, dev_f1 = {:.4f}".format(epoch,\
+                    train_loss, dev_loss, dev_f1))
+            file_logger.log("{}\t{:.6f}\t{:.6f}\t{:.4f}".format(epoch, train_loss, dev_loss, dev_f1))
+
+            # save
+            model_file = model_save_dir + '/ckpt_epoch_{}.pt'.format(epoch)
+            # model.save(model_file, epoch)
+            # torch_utils.save(model, optim, opt, filename=model_file)
+            torch.save({'state_dict': model.state_dict()}, model_file)
+            if len(list_dev_f1) == 0 or dev_f1 > max(list_dev_f1):
+                copyfile(model_file, model_save_dir + '/best_model.pt')
+                print("new best model saved.")
+            if epoch % opt['save_epoch'] != 0:
+                os.remove(model_file)
+
+            list_dev_f1.append(dev_f1)
+            print("")
+
+            # plot and save figure
+            list_train_loss.append(train_loss)
+            list_dev_loss.append(dev_loss)
+            list_dev_f1.append(dev_f1)
+            plt.xlabel("epoch")
+            plt.plot(list_train_loss, label="train loss")
+            plt.plot(list_dev_loss, label="val loss")
+            plt.plot(list_dev_f1, label="dev f1")
+            plt.legend()
+            plt.savefig(model_save_dir + '/loss_f1_vs_epoch.png')
+            plt.clf()
+            plt.close()
+
+    print("Training ended with {} epochs.".format(epoch))
+
+
+if __name__ == '__main__':
+    main()
