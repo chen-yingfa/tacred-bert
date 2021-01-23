@@ -258,7 +258,8 @@ def train(args):
             model_file = model_save_dir + '/ckpt_epoch_{}.pt'.format(epoch)
             # model.save(model_file, epoch)
             # torch_utils.save(model, optim, opt, filename=model_file)
-            torch.save({'state_dict': model.state_dict()}, model_file)
+            # torch.save({'state_dict': model.state_dict()}, model_file)
+            torch.save(model, model_file)
             if len(list_dev_f1) == 0 or dev_f1 > max(list_dev_f1):      # best model
                 copyfile(model_file, model_save_dir + '/best_model.pt')
                 print("new best model saved.")
