@@ -48,7 +48,7 @@ def plot_and_save(train_loss, val_loss, dev_f1, save_dir):
     """
     plt.xlabel("epoch")
     plt.plot(train_loss, label="train loss")
-    plt.plot(dev_loss, label="val loss")
+    plt.plot(val_loss, label="val loss")
     plt.plot(dev_f1, label="dev f1")
     plt.legend()
     plt.savefig(model_save_dir + '/loss_f1_vs_epoch.png')
