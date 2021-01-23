@@ -2,28 +2,26 @@ import torch
 from torch import nn
 
 # from .bert import BertModel
-from transformers import BertModel
+from transformers import BertModel, BertPreTrainedModel
 
+class BertClassifier(BertPreTrainedModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.num_labels = config.num_labels
 
-class BertClassifier(nn.Module):
-    def __init__(self, pretrain_path, tokenizer, max_length, num_labels=42, hidden_size=768):
-        super().__init__()
-        self.pretrain_path = pretrain_path
+        self.bert = BertModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+        self.classifier_mention_pooling = nn.Linear(config.hidden_size * 2, config.num_labels)
+        self.classifier_entity_start = nn.Linear(config.hidden_size * 2, config.num_labels)
+
+        self.linear = nn.Linear(2 * config.hidden_size, 2 * config.hidden_size)
+
+        self.init_weights()
+
+    def set_tokenizer(self, tokenizer, max_length):
         self.tokenizer = tokenizer
         self.max_length = max_length
-        self.num_labels = num_labels
-        self.hidden_size = hidden_size
-
-        # self.bert = BertModel(config)
-        print(f"loading model from pretrained: {pretrain_path}")
-        self.bert = BertModel.from_pretrained(pretrain_path)
-        # self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.dropout = nn.Dropout()
-        self.classifier = nn.Linear(hidden_size, num_labels)
-        self.classifier_mention_pooling = nn.Linear(hidden_size * 2, num_labels)
-        self.classifier_entity_start = nn.Linear(hidden_size * 2, num_labels)
-
-        self.linear = nn.Linear(2 * hidden_size, 2 * hidden_size)
 
     def forward(
         self,
@@ -45,12 +43,20 @@ class BertClassifier(nn.Module):
         # print("e2_pos:", e2_pos)
         # print(e2_pos.shape)
 
-        outputs = self.bert(
-            input_ids,
-            attention_mask=att_mask,
-            # e1_pos_seq=e1_pos_seq,
-            # e2_pos_seq=e2_pos_seq,
-        )
+
+        if output_method == 2:
+            outputs = self.bert(
+                input_ids,
+                attention_mask=att_mask,
+                e1_pos_seq=e1_pos,
+                e2_pos_seq=e2_pos)
+        else:
+            outputs = self.bert(
+                input_ids,
+                attention_mask=att_mask,
+                # e1_pos_seq=e1_pos_seq,
+                # e2_pos_seq=e2_pos_seq,
+            )
 
         # Method 1, [CLS] token (default)
         # Method 2, Entity mention pooling
@@ -60,6 +66,7 @@ class BertClassifier(nn.Module):
             pooled_output = self.dropout(pooled_output)
             logits = self.classifier(pooled_output)
         elif output_method == 2:
+            # Assume that e1_pos, e2_pos are (B, 2), where e1_pos[i] is (start, end)
             last_hidden_states = outputs[0]
             batch_size = input_ids.shape[0]
 

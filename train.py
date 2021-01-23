@@ -12,8 +12,8 @@ from shutil import copyfile
 import torch
 from torch import nn, optim
 from transformers import AdamW
-# from model.classifier_bert import BertClassifier
-from model.bert import BertForSequenceClassification
+from model.classifier_bert import BertClassifier
+# from model.bert import BertForSequenceClassification
 from matplotlib import pyplot as plt
 
 from dataset.loader import DataLoader, get_tokenizer
@@ -45,6 +45,48 @@ def parse_args():
     return parser.parse_args()
 
 
+def plot_and_save(train_loss, val_loss, dev_f1, save_dir):
+    """ 
+    Parameters:
+        loss and f1: [float]
+        save_dir: path of directory to save to
+    """
+    plt.xlabel("epoch")
+    plt.plot(list_train_loss, label="train loss")
+    plt.plot(list_dev_loss, label="val loss")
+    plt.plot(list_dev_f1, label="dev f1")
+    plt.legend()
+    plt.savefig(model_save_dir + '/loss_f1_vs_epoch.png')
+    plt.clf()
+    plt.close()
+
+
+def get_data_loaders(data_dir, tokenize, batch_size, shuffle_train=True):
+    """
+    Parameter:
+
+    Return: train_loader, dev_loader, test_loader
+    """
+    train_loader = REDataLoader(
+        data_dir + '/train.json',
+        constant.LABEL_TO_ID,
+        tokenize,
+        batch_size,
+        True)
+    dev_loader = REDataLoader(
+        data_dir + '/dev.json',
+        constant.LABEL_TO_ID,
+        tokenize,
+        batch_size,
+        False)
+    test_loader = REDataLoader(
+        data_dir + '/test.json',
+        constant.LABEL_TO_ID,
+        tokenize,
+        batch_size,
+        False)
+
+
 def main():
     args = parse_args()
 
@@ -63,7 +105,7 @@ def main():
     id2label = dict([(v,k) for k,v in constant.LABEL_TO_ID.items()])
     lr = args.lr
     weight_decay = 1e-5
-    warmup_step = 300
+    warmup_step = 300s
     max_length = 128
 
     set_seed(12345)
@@ -79,33 +121,17 @@ def main():
     model = BertForSequenceClassification.from_pretrained(
         pretrain_path,
         num_labels=len(id2label))
+    model = BertClassifier.from_pretrained(
+        pretrain_path,
+        num_labels=len(id2label))
+    )
+    
     model.set_tokenizer(tokenizer, max_length)
-    # model = BertClassifier(
-    #     pretrain_path,
-    #     tokenizer,
-    #     max_length=max_length,
-    #     num_labels=len(id2label))
     model.to(device)
-
-    # data loader
-    train_loader = REDataLoader(
-        opt['data_dir'] + '/train.json',
-        constant.LABEL_TO_ID,
+    train_loader, dev_loader, test_loader = get_data_loaders(
+        opt['data_dir'],
         model.tokenize,
-        opt['batch_size'],
-        True)
-    dev_loader = REDataLoader(
-        opt['data_dir'] + '/dev.json',
-        constant.LABEL_TO_ID,
-        model.tokenize,
-        opt['batch_size'],
-        False)
-    test_loader = REDataLoader(
-        opt['data_dir'] + '/test.json',
-        constant.LABEL_TO_ID,
-        model.tokenize,
-        opt['batch_size'],
-        False)
+        opt['batch_size'])
 
     # # load data
     # print("Loading data from {} with batch size {}...".format(opt['data_dir'], opt['batch_size']))
@@ -162,15 +188,19 @@ def main():
             # labels, input_ids, att_mask, e1_pos, e2_pos, e1_pos_seq, e2_pos_seq = batch
             labels, input_ids, att_mask, e1_pos, e2_pos = batch
 
+            for i in range(len(batch)):
+                if batch[i] is not None:
+                    batch[i] = batch[i].to(device)
+
             # change device
-            labels = labels.to(device)
-            input_ids = input_ids.to(device)
-            att_mask = att_mask.to(device)
-            e1_pos = e1_pos.to(device)
-            e2_pos = e2_pos.to(device)
-            if input_method == 2:
-                e1_pos_seq = e1_pos_seq.to(device)
-                e2_pos_seq = e2_pos_seq.to(device)
+            # labels = labels.to(device)
+            # input_ids = input_ids.to(device)
+            # att_mask = att_mask.to(device)
+            # e1_pos = e1_pos.to(device)
+            # e2_pos = e2_pos.to(device)
+            # if input_method == 2:
+            #     e1_pos_seq = e1_pos_seq.to(device)
+            #     e2_pos_seq = e2_pos_seq.to(device)
 
             # pass to model
             logits = model(
@@ -264,27 +294,19 @@ def main():
             # model.save(model_file, epoch)
             # torch_utils.save(model, optim, opt, filename=model_file)
             torch.save({'state_dict': model.state_dict()}, model_file)
-            if len(list_dev_f1) == 0 or dev_f1 > max(list_dev_f1):
+            if len(list_dev_f1) == 0 or dev_f1 > max(list_dev_f1):      # best model
                 copyfile(model_file, model_save_dir + '/best_model.pt')
                 print("new best model saved.")
             if epoch % opt['save_epoch'] != 0:
                 os.remove(model_file)
 
-            list_dev_f1.append(dev_f1)
             print("")
 
             # plot and save figure
             list_train_loss.append(train_loss)
             list_dev_loss.append(dev_loss)
             list_dev_f1.append(dev_f1)
-            plt.xlabel("epoch")
-            plt.plot(list_train_loss, label="train loss")
-            plt.plot(list_dev_loss, label="val loss")
-            plt.plot(list_dev_f1, label="dev f1")
-            plt.legend()
-            plt.savefig(model_save_dir + '/loss_f1_vs_epoch.png')
-            plt.clf()
-            plt.close()
+            plot_and_save(list_list_loss, list_dev_loss, list_dev_f1, model_save_dir)
 
     print("Training ended with {} epochs.".format(epoch))
 

@@ -1017,12 +1017,20 @@ class BertForSequenceClassification(BertPreTrainedModel):
         # print("e2_pos:", e2_pos)
         # print(e2_pos.shape)
 
-        outputs = self.bert(
-            input_ids,
-            attention_mask=att_mask,
-            # e1_pos_seq=e1_pos_seq,
-            # e2_pos_seq=e2_pos_seq,
-        )
+
+        if output_method == 2:
+            outputs = self.bert(
+                input_ids,
+                attention_mask=att_mask,
+                e1_pos_seq=e1_pos,
+                e2_pos_seq=e2_pos)
+        else:
+            outputs = self.bert(
+                input_ids,
+                attention_mask=att_mask,
+                # e1_pos_seq=e1_pos_seq,
+                # e2_pos_seq=e2_pos_seq,
+            )
 
         # Method 1, [CLS] token (default)
         # Method 2, Entity mention pooling
@@ -1032,6 +1040,7 @@ class BertForSequenceClassification(BertPreTrainedModel):
             pooled_output = self.dropout(pooled_output)
             logits = self.classifier(pooled_output)
         elif output_method == 2:
+            # Assume that e1_pos, e2_pos are (B, 2), where e1_pos[i] is (start, end)
             last_hidden_states = outputs[0]
             batch_size = input_ids.shape[0]
 
