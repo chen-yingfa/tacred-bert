@@ -17,7 +17,7 @@ from model.classifier_bert import BertClassifier
 from matplotlib import pyplot as plt
 
 from dataset.loader import DataLoader, get_tokenizer
-from dataset.dataset import get_data_loaders
+from dataset.dataset import get_data_loaders, REDataLoader
 from utils import scorer, constant, helper, torch_utils
 
 
@@ -70,20 +70,18 @@ def test(args):
     
     model.set_tokenizer(tokenizer, max_length)
     model.to(device)
-    train_loader, dev_loader, test_loader = get_data_loaders(
-        opt['data_dir'],
-        model.tokenize,
-        opt['batch_size'])
+    test_loader = REDataLoader(
+        data_dir + '/test.json',
+        label2id,
+        tokenize,
+        batch_size,
+        False)
 
     # model dir
     model_save_dir = opt['save_dir'] + '/' + args.id
     opt['model_save_dir'] = model_save_dir
     helper.ensure_dir(model_save_dir, verbose=True)
     print("model_save_dir:", model_save_dir)
-
-    # save config
-    helper.save_config(opt, model_save_dir + '/config.json', verbose=True)
-    file_logger = helper.FileLogger(model_save_dir + '/' + opt['log'], header="# epoch\ttrain_loss\tdev_loss\tdev_f1")
 
     # print model info
     helper.print_config(opt)
@@ -106,12 +104,8 @@ def test(args):
     # start training
     for epoch in range(1, opt['num_epoch']+1):
         train_loss = 0
-        model.train()
-        for i, batch in enumerate(train_loader):
-            optimizer.zero_grad()
+        for i, batch in enumerate(test_loader):
             start_time = time.time()
-
-            # labels, input_ids, att_mask, e1_pos, e2_pos, e1_pos_seq, e2_pos_seq = batch
             labels, input_ids, att_mask, e1_pos, e2_pos = batch
 
             for i in range(len(batch)):
@@ -124,11 +118,7 @@ def test(args):
                 att_mask=att_mask,
                 e1_pos=e1_pos,
                 e2_pos=e2_pos,
-                # e1_pos_seq=e1_pos_seq,
-                # e2_pos_seq=e2_pos_seq,
                 output_method=output_method)
-
-            # print(logits)
 
             loss = criterion(logits, labels)
 
@@ -138,20 +128,9 @@ def test(args):
                 timestr = '{:%m-%d %H:%M:%S}'.format(datetime.now())
                 print(format_str.format(timestr, global_step, train_steps, epoch,\
                         opt['num_epoch'], loss, duration))
-
-
-
-            # optimize
-            loss.backward()
-            # if (i + 1) % grad_acc_steps == 0: # gradient accumulation
-
-            optimizer.step()
-            if scheduler is not None:
-                scheduler.step()
             
             train_loss += loss
             global_step += 1
-        
 
         # eval on dev
         print("Evaluating on dev set...")

@@ -151,11 +151,11 @@ def train(args):
             start_time = time.time()
 
             # labels, input_ids, att_mask, e1_pos, e2_pos, e1_pos_seq, e2_pos_seq = batch
-            labels, input_ids, att_mask, e1_pos, e2_pos = batch
-
             for i in range(len(batch)):
                 if batch[i] is not None:
                     batch[i] = batch[i].to(device)
+
+            labels, input_ids, att_mask, e1_pos, e2_pos = batch
 
             # change device
             # labels = labels.to(device)
