@@ -272,7 +272,7 @@ def train(args):
             list_train_loss.append(train_loss)
             list_dev_loss.append(dev_loss)
             list_dev_f1.append(dev_f1)
-            plot_and_save(list_list_loss, list_dev_loss, list_dev_f1, model_save_dir)
+            plot_and_save(list_train_loss, list_dev_loss, list_dev_f1, model_save_dir)
 
     print("Training ended with {} epochs.".format(epoch))
 
