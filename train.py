@@ -17,19 +17,13 @@ from model.classifier_bert import BertClassifier
 from matplotlib import pyplot as plt
 
 from dataset.loader import DataLoader, get_tokenizer
-from dataset.dataset import REDataLoader
+from dataset.dataset import get_data_loaders
 from utils import scorer, constant, helper, torch_utils
 
-def set_seed(seed):
-    torch.cuda.manual_seed(seed)
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.backends.cudnn.deterministic=True
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', type=str, default='dataset/tacred')
+    parser.add_argument('--data_dir', type=str, default='dataset/tacred-small')
     parser.add_argument('--word_dropout', type=float, default=0.04, help='The rate at which randomly set a word to UNK.')
     parser.add_argument('--lr', type=float, default=2e-5, help='Applies to SGD and Adagrad.')
     parser.add_argument('--optim', type=str, default='adamw', help='sgd, adam or adamw.')
@@ -41,7 +35,6 @@ def parse_args():
     parser.add_argument('--save_epoch', type=int, default=1, help='Save model checkpoints every k epochs.')
     parser.add_argument('--save_dir', type=str, default='./saved_models', help='Root dir for saving models.')
     parser.add_argument('--id', type=str, default='test', help='Model ID under which to save models.')
-    parser.add_argument('--info', type=str, default='', help='Optional info for the experiment.')
     return parser.parse_args()
 
 
@@ -61,35 +54,7 @@ def plot_and_save(train_loss, val_loss, dev_f1, save_dir):
     plt.close()
 
 
-def get_data_loaders(data_dir, tokenize, batch_size, shuffle_train=True):
-    """
-    Parameter:
-
-    Return: train_loader, dev_loader, test_loader
-    """
-    train_loader = REDataLoader(
-        data_dir + '/train.json',
-        constant.LABEL_TO_ID,
-        tokenize,
-        batch_size,
-        True)
-    dev_loader = REDataLoader(
-        data_dir + '/dev.json',
-        constant.LABEL_TO_ID,
-        tokenize,
-        batch_size,
-        False)
-    test_loader = REDataLoader(
-        data_dir + '/test.json',
-        constant.LABEL_TO_ID,
-        tokenize,
-        batch_size,
-        False)
-
-
-def main():
-    args = parse_args()
-
+def train(args):
     # method
     input_method_name = ["", "standard", "positional_embedding", "entity_markers"]
     output_method_name = ["", "cls_token", "mention_pooling", "entity_start"]
@@ -105,10 +70,10 @@ def main():
     id2label = dict([(v,k) for k,v in constant.LABEL_TO_ID.items()])
     lr = args.lr
     weight_decay = 1e-5
-    warmup_step = 300s
+    warmup_step = 300
     max_length = 128
 
-    set_seed(12345)
+    torch_utils.set_seed(12345)
 
     # make opt
     opt = vars(args)
@@ -118,18 +83,18 @@ def main():
 
     # model
     tokenizer = get_tokenizer(pretrain_path)
-    model = BertForSequenceClassification.from_pretrained(
-        pretrain_path,
-        num_labels=len(id2label))
+    # model = BertForSequenceClassification.from_pretrained(
+    #     pretrain_path,
+    #     num_labels=len(id2label))
     model = BertClassifier.from_pretrained(
         pretrain_path,
         num_labels=len(id2label))
-    )
     
     model.set_tokenizer(tokenizer, max_length)
     model.to(device)
     train_loader, dev_loader, test_loader = get_data_loaders(
         opt['data_dir'],
+        constant.LABEL_TO_ID,
         model.tokenize,
         opt['batch_size'])
 
@@ -309,6 +274,11 @@ def main():
             plot_and_save(list_list_loss, list_dev_loss, list_dev_f1, model_save_dir)
 
     print("Training ended with {} epochs.".format(epoch))
+
+
+def main():
+    args = parse_args()
+    train(args)
 
 
 if __name__ == '__main__':

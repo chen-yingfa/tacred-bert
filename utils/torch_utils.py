@@ -1,7 +1,8 @@
 """
 Utility functions for torch.
 """
-
+import random
+import numpy as np
 import torch
 from torch import nn, optim
 from torch.optim import Optimizer
@@ -126,7 +127,14 @@ def get_scheduler(optimizer, num_train_steps, warmup_step):
             num_warmup_steps=warmup_step,
             num_training_steps=num_train_steps)
     return None
-    
+
+def set_seed(seed):
+    torch.cuda.manual_seed(seed)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic=True
+
 def change_lr(optimizer, new_lr):
     for param_group in optimizer.param_groups:
         param_group['lr'] = new_lr

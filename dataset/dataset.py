@@ -137,3 +137,30 @@ def REDataLoader(
         num_workers=num_workers,
         collate_fn=collate_fn)
     return data_loader
+
+
+def get_data_loaders(data_dir, label2id, tokenize, batch_size, shuffle_train=True):
+    """
+    Parameter:
+
+    Return: train_loader, dev_loader, test_loader
+    """
+    train_loader = REDataLoader(
+        data_dir + '/train.json',
+        label2id,
+        tokenize,
+        batch_size,
+        True)
+    dev_loader = REDataLoader(
+        data_dir + '/dev.json',
+        label2id,
+        tokenize,
+        batch_size,
+        False)
+    test_loader = REDataLoader(
+        data_dir + '/test.json',
+        label2id,
+        tokenize,
+        batch_size,
+        False)
+    return train_loader, dev_loader, test_loader
