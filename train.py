@@ -47,9 +47,9 @@ def plot_and_save(train_loss, val_loss, dev_f1, save_dir):
         save_dir: path of directory to save to
     """
     plt.xlabel("epoch")
-    plt.plot(list_train_loss, label="train loss")
-    plt.plot(list_dev_loss, label="val loss")
-    plt.plot(list_dev_f1, label="dev f1")
+    plt.plot(train_loss, label="train loss")
+    plt.plot(dev_loss, label="val loss")
+    plt.plot(dev_f1, label="dev f1")
     plt.legend()
     plt.savefig(model_save_dir + '/loss_f1_vs_epoch.png')
     plt.clf()
