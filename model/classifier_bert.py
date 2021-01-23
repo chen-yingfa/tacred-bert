@@ -95,7 +95,7 @@ class BertClassifier(BertPreTrainedModel):
             logits = self.classifier_mention_pooling(x)  # (B, C)
         elif output_method == 3:
             # e1_pos = e1_pos[:, 0].unsqueeze(1)  # (B, 1)
-            index = torch.tensor([0])
+            index = torch.tensor([0]).to(input_ids.device)
             e1_pos = torch.index_select(e1_pos, 1, index)
             hidden_states = outputs[0]          # (B, L, H)
             batch_size = e1_pos.shape[0]
