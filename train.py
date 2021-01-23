@@ -24,19 +24,19 @@ from utils import scorer, constant, helper, torch_utils
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir', type=str, default='dataset/tacred-small')
-    parser.add_argument('--word_dropout', type=float, default=0.04, help='The rate at which randomly set a word to UNK.')
+    # parser.add_argument('--word_dropout', type=float, default=0.04, help='The rate at which randomly set a word to UNK.')
     parser.add_argument('--lr', type=float, default=2e-5, help='Applies to SGD and Adagrad.')
     parser.add_argument('--optim', type=str, default='adamw', help='sgd, adam or adamw.')
     parser.add_argument('--num_epoch', type=int, default=16)
-    parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--input_method', type=int, default=3)
     parser.add_argument('--output_method', type=int, default=3)
-    parser.add_argument('--max_grad_norm', type=float, default=5.0, help='Gradient clipping.')
+    # parser.add_argument('--max_grad_norm', type=float, default=5.0, help='Gradient clipping.')
     parser.add_argument('--log_step', type=int, default=50, help='Print log every k steps.')
     parser.add_argument('--log', type=str, default='logs.txt', help='Write training log to file.')
     parser.add_argument('--save_epoch', type=int, default=1, help='Save model checkpoints every k epochs.')
     parser.add_argument('--save_dir', type=str, default='./saved_models', help='Root dir for saving models.')
-    parser.add_argument('--id', type=str, default='test', help='Model ID under which to save models.')
+    parser.add_argument('--name', type=str, default='test', help='Unique name under which to save models.')
     return parser.parse_args()
 
 
@@ -51,7 +51,7 @@ def plot_and_save(train_loss, val_loss, dev_f1, save_dir):
     plt.plot(val_loss, label="val loss")
     plt.plot(dev_f1, label="dev f1")
     plt.legend()
-    plt.savefig(model_save_dir + '/loss_f1_vs_epoch.png')
+    plt.savefig(save_dir + '/loss_f1_vs_epoch.png')
     plt.clf()
     plt.close()
 
@@ -92,7 +92,7 @@ def train(args):
         pretrain_path,
         num_labels=len(id2label))
     
-    model.set_tokenizer(tokenizer, max_length)
+    model.set_tokenizer(tokenizer, max_length, output_method)
     model.to(device)
     train_loader, dev_loader, test_loader = get_data_loaders(
         opt['data_dir'],
@@ -117,7 +117,7 @@ def train(args):
     #     input_method=input_method)
 
     # model dir
-    model_save_dir = opt['save_dir'] + '/' + args.id
+    model_save_dir = opt['save_dir'] + '/' + args.name
     opt['model_save_dir'] = model_save_dir
     helper.ensure_dir(model_save_dir, verbose=True)
     print("model_save_dir:", model_save_dir)
@@ -149,7 +149,7 @@ def train(args):
         train_loss = 0
         model.train()
         for i, batch in enumerate(train_loader):
-            optimizer.zero_grad()
+            # optimizer.zero_grad()
             start_time = time.time()
 
             for i in range(len(batch)):
@@ -178,11 +178,13 @@ def train(args):
                 print(format_str.format(timestr, global_step, train_steps, epoch,\
                         opt['num_epoch'], loss, duration))
 
-            # optimize
             loss.backward()
-            optimizer.step()
-            if scheduler is not None:
-                scheduler.step()
+            # optimize
+            if (i + 1) % grad_acc_steps == 0:
+                optimizer.step()
+                if scheduler is not None:
+                    scheduler.step()
+                optimizer.zero_grad()
             
             train_loss += loss
             global_step += 1

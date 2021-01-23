@@ -20,9 +20,10 @@ class BertClassifier(BertPreTrainedModel):
 
         self.init_weights()
 
-    def set_tokenizer(self, tokenizer, max_length):
+    def set_tokenizer(self, tokenizer, max_length, output_method):
         self.tokenizer = tokenizer
         self.max_length = max_length
+        self.output_method = output_method
 
     def forward(
         self,
@@ -34,11 +35,6 @@ class BertClassifier(BertPreTrainedModel):
         e2_pos_seq=None,
         output_method=3,
     ):
-
-        # print("input_ids:", input_ids)
-        # print(input_ids.shape)
-        # print("att_mask:", att_mask)
-        # print(att_mask.shape)
         # print("e1_pos:", e1_pos)
         # print(e1_pos.shape)
         # print("e2_pos:", e2_pos)
@@ -94,14 +90,9 @@ class BertClassifier(BertPreTrainedModel):
             x = self.dropout(x)                          # (B, 2H)
             logits = self.classifier_mention_pooling(x)  # (B, C)
         elif output_method == 3:
-            # e1_pos = e1_pos[:, 0].unsqueeze(1)  # (B, 1)
-            index = torch.tensor([0]).to(input_ids.device)
-            e1_pos = torch.index_select(e1_pos, 1, index)
+            # e1_pos: (B, 1)
             hidden_states = outputs[0]          # (B, L, H)
             batch_size = e1_pos.shape[0]
-
-            # print("e1_pos:", e1_pos)
-            # print(e1_pos.shape)
 
             # Get embedding of start markers
             onehot1 = torch.zeros(hidden_states.size()[:2]).float().to(input_ids.device)  # (B, L)
@@ -165,8 +156,13 @@ class BertClassifier(BertPreTrainedModel):
         avai_len = len(indexed_tokens)
 
         # Position
-        pos1 = torch.tensor([[pos1, end1]]).long()
-        pos2 = torch.tensor([[pos2, end2]]).long()
+        if self.output_method == 2:
+            pos1 = torch.tensor([[pos1, end1]]).long()
+            pos2 = torch.tensor([[pos2, end2]]).long()
+        else:
+            pos1 = torch.tensor([[pos1]]).long()
+            pos2 = torch.tensor([[pos2]]).long()
+            
 
         # Padding
         while len(indexed_tokens) < self.max_length:

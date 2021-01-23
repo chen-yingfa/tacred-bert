@@ -125,7 +125,7 @@ def REDataLoader(
         tokenizer,
         batch_size,
         shuffle,
-        num_workers=8,
+        num_workers=0,
         collate_fn=REDataset.collate_fn,
         **kwargs):
     dataset = REDataset(path=path, rel2id=rel2id, tokenizer=tokenizer, kwargs=kwargs)
