@@ -25,7 +25,7 @@ def parse_args():
     parser.add_argument('--data_dir', type=str, default='dataset/tacred-small')
     parser.add_argument('--lr', type=float, default=2e-5, help='Applies to SGD and Adagrad.')
     parser.add_argument('--optim', type=str, default='adamw', help='sgd, adam or adamw.')
-    parser.add_argument('--num_epoch', type=int, default=16)
+    parser.add_argument('--num_epoch', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--input_method', type=int, default=3)
     parser.add_argument('--output_method', type=int, default=3)
@@ -159,10 +159,7 @@ def train(args):
                 input_ids,
                 att_mask=att_mask,
                 e1_pos=e1_pos,
-                e2_pos=e2_pos,
-                # e1_pos_seq=e1_pos_seq,
-                # e2_pos_seq=e2_pos_seq,
-                output_method=output_method)
+                e2_pos=e2_pos)
 
             # print(logits)
 
@@ -207,10 +204,7 @@ def train(args):
                     input_ids,
                     att_mask=att_mask,
                     e1_pos=e1_pos,
-                    e2_pos=e2_pos,
-                    # e1_pos_seq=e1_pos_seq,
-                    # e2_pos_seq=e2_pos_seq,
-                    output_method=output_method)
+                    e2_pos=e2_pos)
 
                 # logits = outputs.logits
                 loss = criterion(logits, labels)

@@ -32,21 +32,59 @@ class BertClassifier(BertPreTrainedModel):
         att_mask=None,
         e1_pos=None,
         e2_pos=None,
-        e1_pos_seq=None,
-        e2_pos_seq=None,
-        output_method=3,
     ):
         # print("e1_pos:", e1_pos)
         # print(e1_pos.shape)
         # print("e2_pos:", e2_pos)
         # print(e2_pos.shape)
 
-        outputs = self.bert(
-            input_ids,
-            attention_mask=att_mask,
-            e1_pos_seq=e1_pos_seq,
-            e2_pos_seq=e2_pos_seq,
-        )
+        if self.input_method == 2:
+            # create index: [0, 1, ..., k, k, ..., ]
+            dev = input_ids.device
+            p1 = []
+            p2 = []
+            for p in e1_pos:
+                i0 = self.max_length - p[0]
+                i1 = self.max_length
+                i2 = 2 * self.max_length - p[1]
+                a = torch.arange(i0, i1).to(dev)
+                b = torch.full((p[1] - p[0] + 1,), i1).long().to(dev)
+                try:
+                    c = torch.arange(i1 + 1, i2).to(dev)
+                except:
+                    print(e1_pos)
+                    print(e2_pos)
+                    print(p)
+                    print(i1, i2)
+                    exit(0)
+                seq = torch.cat((a, b, c), dim=0)      # (H,)
+                p1.append(seq)
+
+            for p in e2_pos:
+                i0 = self.max_length - p[0]
+                i1 = self.max_length
+                i2 = 2 * self.max_length - p[1] + 1
+                a = torch.arange(i0, i1).to(dev)
+                b = torch.full((p[1] - p[0],), i1).long().to(dev)
+                c = torch.arange(i1 + 1, i2).to(dev)
+                seq = torch.cat((a, b, c), dim=0)      # (H,)
+                p2.append(seq)
+
+            e1_pos_seq = torch.stack(p1)    # (B, H)
+            e2_pos_seq = torch.stack(p2)    # (B, H)
+            # print("e1_pos_seq:", e1_pos_seq)
+            # print(e1_pos_seq.shape)
+            # print("e2_pos_seq:", e2_pos_seq)
+            # print(e2_pos_seq.shape)
+
+            outputs = self.bert(
+                input_ids,
+                attention_mask=att_mask,
+                e1_pos_seq=e1_pos_seq,
+                e2_pos_seq=e2_pos_seq,
+            )
+        else:
+            outputs = self.bert(input_ids, attention_mask=att_mask)
 
         # Method 1, [CLS] token (default)
         # Method 2, Entity mention pooling
@@ -64,7 +102,7 @@ class BertClassifier(BertPreTrainedModel):
             embeds = []
             for i in range(batch_size):
                 # First handle entity 1
-                e1_embed = last_hidden_states[i, e1_pos[i][0]:e1_pos[i][1], :]  # (K, H), k is token count in entity
+                e1_embed = last_hidden_states[i, e1_pos[i][0]:e1_pos[i][1]+1, :]  # (K, H), k is token count in entity
                 e1_embed = e1_embed.permute(1, 0)                               # (H, K)
                 if e1_embed.shape[1] > 1:
                     # pool
@@ -74,7 +112,7 @@ class BertClassifier(BertPreTrainedModel):
                 e1_embed = e1_embed.squeeze()  # (H)
                 
                 # Repeat for entity 2
-                e2_embed = last_hidden_states[i, e2_pos[i][0]:e2_pos[i][1], :]
+                e2_embed = last_hidden_states[i, e2_pos[i][0]:e2_pos[i][1]+1, :]
                 e2_embed = e2_embed.permute(1, 0)
                 if e2_embed.shape[1] > 1:
                     # pool
@@ -149,25 +187,25 @@ class BertClassifier(BertPreTrainedModel):
         pos1 = 1 + len(sent0) if not rev else 1 + len(sent0 + ent0 + sent1)
         pos2 = 1 + len(sent0 + ent0 + sent1) if not rev else 1 + len(sent0)
         
-        if self.output_method == 2:  # Mention pooling, need to compute end pos
-            if not rev:
-                end1 = pos1 + len(ent0)
-                end2 = pos2 + len(ent1)
-            else:
-                end1 = pos1 + len(ent1)
-                end2 = pos2 + len(ent0)
-            if self.input_method == 3:  # Entity markers
-                end1 -= 1
-                end2 -= 1
-        
+        # make sure pos index are not > max_length
         pos1 = min(self.max_length - 1, pos1)
         pos2 = min(self.max_length - 1, pos2)
-        
+
         indexed_tokens = self.tokenizer.convert_tokens_to_ids(re_tokens)
         avai_len = len(indexed_tokens)
 
         # Position
         if self.output_method == 2:     # Mention pooling
+            # compute end pos
+            if not rev:
+                end1 = pos1 + len(ent0) - 1
+                end2 = pos2 + len(ent1) - 1
+            else:
+                end1 = pos1 + len(ent1) - 1
+                end2 = pos2 + len(ent0) - 1
+            end1 = min(self.max_length - 1, end1)
+            end2 = min(self.max_length - 1, end2)
+
             pos1 = torch.tensor([[pos1, end1]]).long()
             pos2 = torch.tensor([[pos2, end2]]).long()
         else:
@@ -186,3 +224,18 @@ class BertClassifier(BertPreTrainedModel):
         att_mask[0, :avai_len] = 1
 
         return indexed_tokens, att_mask, pos1, pos2
+
+
+def get_positions(start_idx, end_idx, length):
+    """ Get subj/obj position sequence. 
+    [-start, ..., -1, 0, ..., 0, 1, ..., len - end]
+                      ^       ^
+                 start_idx  end_idx
+    """
+    return list(range(-start_idx, 0)) + [0]*(end_idx - start_idx + 1) + \
+            list(range(1, length-end_idx))
+
+
+def get_pos_seq(start, end, length):
+    seq = get_positions(start, end, length)
+    return [e + length for e in seq]

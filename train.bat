@@ -1,1 +1,1 @@
-python train.py --batch_size=8 --log_step=20 --data_dir=dataset/tacred
+python train.py --input_method=2 --output_method=2 --batch_size=8 --log_step=20 --data_dir=dataset/tacred

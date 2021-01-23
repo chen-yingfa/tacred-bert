@@ -53,11 +53,11 @@ Parameters:
 
 | Input type      | Output type     | Dev F1 | Test F1 |
 | --------------- | --------------- | ------ | ------- |
-| Standard        | [CLS]           |        |         |
-| Standard        | Mention pooling |        |         |
+| Standard        | [CLS]           | 23.2   |         |
+| Standard        | Mention pooling | 65.7   |         |
 | Positional emb. | Mention pooling |        |         |
-| Entity markers  | [CLS]           |        |         |
-| Entity markers  | Mention pooling | 65.6   |         |
+| Entity markers  | [CLS]           | 65.8   |         |
+| Entity markers  | Mention pooling | 67.5   |         |
 | Entity markers  | Entity start    | 69.3   | 68.5    |
 
 ## Developer's Note
