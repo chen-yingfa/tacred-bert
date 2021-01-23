@@ -47,7 +47,7 @@ Parameters:
 - Weight initialization: bert-base-uncased
 - Transformers architecture: 12 layers, 768 hidden size, 12 heads
 - Batch size: 64
-- Learning rate: 2e-5 with Adam,
+- Learning rate: 2e-5 with AdamW,
   - Warmup steps: 300
   - Weight decay: 1e-5
 
@@ -57,8 +57,8 @@ Parameters:
 | Standard        | Mention pooling |        |         |
 | Positional emb. | Mention pooling |        |         |
 | Entity markers  | [CLS]           |        |         |
-| Entity markers  | Mention pooling | 64.8   |         |
-| Entity markers  | Entity start    | 69.3   | 69.3    |
+| Entity markers  | Mention pooling | 65.6   |         |
+| Entity markers  | Entity start    | 69.3   | 68.5    |
 
 ## Developer's Note
 

@@ -10,16 +10,16 @@ import argparse
 import torch
 from torch import nn, optim
 from transformers import AdamW
-# from model.classifier_bert import BertClassifier
-from model.bert import BertForSequenceClassification
+from model.classifier_bert import BertClassifier
+# from model.bert import BertForSequenceClassification
 
-from dataset.data_loader import DataLoader, get_tokenizer
-from dataset.dataset import get_data_loaders, REDataLoader
+from dataset.data_loader import get_data_loaders, REDataLoader, get_tokenizer
 from utils import scorer, constant, helper, torch_utils
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir', type=str, default='dataset/tacred-example')
+    parser.add_argument('--model_file', type=str, default='best_model.pt')
     parser.add_argument('--log_step', type=int, default=50, help='Print log every k steps.')
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--output', type=str, default='test_result.txt', help='Write training log to file.')
@@ -52,14 +52,13 @@ def test(args):
 
     # Load Model
     tokenizer = get_tokenizer(pretrain_path)
-    model_file = 'ckpt_epoch_2.pt'
-    model_path = f"{opt['save_dir']}/{args.name}/{model_file}"
+    model_path = f"{opt['save_dir']}/{args.name}/{args.model_file}"
     print("model_path:", model_path)
     print('')
-    model = BertForSequenceClassification.from_pretrained(
+    model = BertClassifier.from_pretrained(
         pretrain_path, num_labels=42)
     model.load_state_dict(torch.load(model_path)['state_dict'])
-    model.set_tokenizer(tokenizer, max_length)
+    model.set_tokenizer(tokenizer, max_length, input_method, output_method)
 
     # model = torch.load(model_save_dir)
     model.to(device)

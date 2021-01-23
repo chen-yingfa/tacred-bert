@@ -16,8 +16,7 @@ from model.classifier_bert import BertClassifier
 # from model.bert import BertForSequenceClassification
 from matplotlib import pyplot as plt
 
-from dataset.data_loader import DataLoader, get_tokenizer
-from dataset.dataset import get_data_loaders
+from dataset.data_loader import get_data_loaders, get_tokenizer
 from utils import scorer, constant, helper, torch_utils
 
 
@@ -90,7 +89,7 @@ def train(args):
         pretrain_path,
         num_labels=len(id2label))
     
-    model.set_tokenizer(tokenizer, max_length, output_method)
+    model.set_tokenizer(tokenizer, max_length, input_method, output_method)
     model.to(device)
     train_loader, dev_loader, test_loader = get_data_loaders(
         opt['data_dir'],

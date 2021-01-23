@@ -20,9 +20,10 @@ class BertClassifier(BertPreTrainedModel):
 
         self.init_weights()
 
-    def set_tokenizer(self, tokenizer, max_length, output_method):
+    def set_tokenizer(self, tokenizer, max_length, input_method, output_method):
         self.tokenizer = tokenizer
         self.max_length = max_length
+        self.input_method = input_method
         self.output_method = output_method
 
     def forward(
@@ -50,11 +51,11 @@ class BertClassifier(BertPreTrainedModel):
         # Method 1, [CLS] token (default)
         # Method 2, Entity mention pooling
         # Method 3, Entity start
-        if output_method == 1:
+        if self.output_method == 1:
             x = outputs[1]              # (H)
             x = self.dropout(x)         # (H)
             logits = self.classifier(x) # (C)
-        elif output_method == 2:
+        elif self.output_method == 2:
             # Assume that e1_pos, e2_pos are (B, 2), where e1_pos[i] is (start, end)
             last_hidden_states = outputs[0] # (B, L, H)
             batch_size = input_ids.shape[0]
@@ -89,7 +90,7 @@ class BertClassifier(BertPreTrainedModel):
             x = self.linear(x)                           # (B, 2H)
             x = self.dropout(x)                          # (B, 2H)
             logits = self.classifier_mention_pooling(x)  # (B, C)
-        elif output_method == 3:
+        elif self.output_method == 3:
             # e1_pos: (B, 1)
             hidden_states = outputs[0]          # (B, L, H)
             batch_size = e1_pos.shape[0]
@@ -140,15 +141,25 @@ class BertClassifier(BertPreTrainedModel):
         ent1 = self.tokenizer.tokenize(' '.join(sentence[pos_max[0]:pos_max[1]]))
         sent2 = self.tokenizer.tokenize(' '.join(sentence[pos_max[1]:]))
 
-
-        ent0 = ['[unused0]'] + ent0 + ['[unused1]'] if not rev else ['[unused2]'] + ent0 + ['[unused3]']
-        ent1 = ['[unused2]'] + ent1 + ['[unused3]'] if not rev else ['[unused0]'] + ent1 + ['[unused1]']
+        if self.input_method == 3: 
+            ent0 = ['[unused0]'] + ent0 + ['[unused1]'] if not rev else ['[unused2]'] + ent0 + ['[unused3]']
+            ent1 = ['[unused2]'] + ent1 + ['[unused3]'] if not rev else ['[unused0]'] + ent1 + ['[unused1]']
 
         re_tokens = ['[CLS]'] + sent0 + ent0 + sent1 + ent1 + sent2 + ['[SEP]']
         pos1 = 1 + len(sent0) if not rev else 1 + len(sent0 + ent0 + sent1)
         pos2 = 1 + len(sent0 + ent0 + sent1) if not rev else 1 + len(sent0)
-        end1 = pos1 + len(ent0) + 1 if not rev else pos1 + len(ent1) + 1
-        end2 = pos2 + len(ent1) + 1 if not rev else pos2 + len(ent0) + 1
+        
+        if self.output_method == 2:  # Mention pooling, need to compute end pos
+            if not rev:
+                end1 = pos1 + len(ent0)
+                end2 = pos2 + len(ent1)
+            else:
+                end1 = pos1 + len(ent1)
+                end2 = pos2 + len(ent0)
+            if self.input_method == 3:  # Entity markers
+                end1 -= 1
+                end2 -= 1
+        
         pos1 = min(self.max_length - 1, pos1)
         pos2 = min(self.max_length - 1, pos2)
         
@@ -156,7 +167,7 @@ class BertClassifier(BertPreTrainedModel):
         avai_len = len(indexed_tokens)
 
         # Position
-        if self.output_method == 2:
+        if self.output_method == 2:     # Mention pooling
             pos1 = torch.tensor([[pos1, end1]]).long()
             pos2 = torch.tensor([[pos2, end2]]).long()
         else:
