@@ -146,9 +146,7 @@ def get_data_loaders(data_dir, label2id, tokenize, batch_size, shuffle_train=Tru
 
     Return: train_loader, dev_loader, test_loader
     """
-    num_workers = 8
-    if os.name == 'nt':
-        num_workers = 0
+    num_workers = 0 if os.name == 'nt' else 8
     train_loader = REDataLoader(
         data_dir + '/train.json',
         label2id,

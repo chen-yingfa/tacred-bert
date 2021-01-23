@@ -66,12 +66,14 @@ def test(args):
 
     # Data loader
     data_path = args.data_dir + '/test.json'
+    num_workers = 0 if os.name == 'nt' else 8
     data_loader = REDataLoader(
         data_path,
         constant.LABEL_TO_ID,
         model.tokenize,
         args.batch_size,
-        False)
+        False,
+        num_workers=num_workers)
     print(f"\nLoaded {len(data_loader.dataset)} examples from {data_path}")
 
     # Print model info
