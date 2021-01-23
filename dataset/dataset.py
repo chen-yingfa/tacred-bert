@@ -150,7 +150,7 @@ def get_data_loaders(data_dir, label2id, tokenize, batch_size, shuffle_train=Tru
         label2id,
         tokenize,
         batch_size,
-        True)
+        shuffle_train)
     dev_loader = REDataLoader(
         data_dir + '/dev.json',
         label2id,

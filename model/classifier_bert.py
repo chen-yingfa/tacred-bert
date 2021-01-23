@@ -1,8 +1,9 @@
 import torch
 from torch import nn
 
-# from .bert import BertModel
-from transformers import BertModel, BertPreTrainedModel
+from .bert import BertModel
+from transformers import BertPreTrainedModel
+# from transformers import BertModel, BertPreTrainedModel
 
 class BertClassifier(BertPreTrainedModel):
     def __init__(self, config):
@@ -31,7 +32,7 @@ class BertClassifier(BertPreTrainedModel):
         e2_pos=None,
         e1_pos_seq=None,
         e2_pos_seq=None,
-        output_method=None,
+        output_method=3,
     ):
 
         # print("input_ids:", input_ids)
@@ -43,45 +44,37 @@ class BertClassifier(BertPreTrainedModel):
         # print("e2_pos:", e2_pos)
         # print(e2_pos.shape)
 
-
-        if output_method == 2:
-            outputs = self.bert(
-                input_ids,
-                attention_mask=att_mask,
-                e1_pos_seq=e1_pos,
-                e2_pos_seq=e2_pos)
-        else:
-            outputs = self.bert(
-                input_ids,
-                attention_mask=att_mask,
-                # e1_pos_seq=e1_pos_seq,
-                # e2_pos_seq=e2_pos_seq,
-            )
+        outputs = self.bert(
+            input_ids,
+            attention_mask=att_mask,
+            e1_pos_seq=e1_pos_seq,
+            e2_pos_seq=e2_pos_seq,
+        )
 
         # Method 1, [CLS] token (default)
         # Method 2, Entity mention pooling
         # Method 3, Entity start
         if output_method == 1:
-            pooled_output = outputs[1]
-            pooled_output = self.dropout(pooled_output)
-            logits = self.classifier(pooled_output)
+            x = outputs[1]              # (H)
+            x = self.dropout(x)         # (H)
+            logits = self.classifier(x) # (C)
         elif output_method == 2:
             # Assume that e1_pos, e2_pos are (B, 2), where e1_pos[i] is (start, end)
-            last_hidden_states = outputs[0]
+            last_hidden_states = outputs[0] # (B, L, H)
             batch_size = input_ids.shape[0]
 
             # Because entity length differs from batch to batch, so have to handle individually
             embeds = []
             for i in range(batch_size):
                 # First handle entity 1
-                e1_embed = last_hidden_states[i, e1_pos[i][0]:e1_pos[i][1], :]
-                e1_embed = e1_embed.permute(1, 0)
+                e1_embed = last_hidden_states[i, e1_pos[i][0]:e1_pos[i][1], :]  # (K, H), k is token count in entity
+                e1_embed = e1_embed.permute(1, 0)                               # (H, K)
                 if e1_embed.shape[1] > 1:
                     # pool
                     pooling = nn.MaxPool1d(kernel_size=e1_embed.shape[1], stride=1)
                     e1_embed = e1_embed.unsqueeze(0)
-                    e1_embed = pooling(e1_embed)
-                e1_embed = e1_embed.squeeze()
+                    e1_embed = pooling(e1_embed)    # (H, 1)
+                e1_embed = e1_embed.squeeze()  # (H)
                 
                 # Repeat for entity 2
                 e2_embed = last_hidden_states[i, e2_pos[i][0]:e2_pos[i][1], :]
@@ -91,58 +84,37 @@ class BertClassifier(BertPreTrainedModel):
                     pooling = nn.MaxPool1d(e2_embed.shape[1], stride=1)
                     e2_embed = e2_embed.unsqueeze(0)
                     e2_embed = pooling(e2_embed)
-                e2_embed = e2_embed.squeeze()
+                e2_embed = e2_embed.squeeze()   # (H)
 
-                embed = torch.cat((e1_embed, e2_embed), dim=0)  # concatenate output for two entities
+                embed = torch.cat((e1_embed, e2_embed), dim=0)  # concatenate output for two entities (2*H)
                 embeds.append(embed)
-
-            # Stack together to form final output representation
-            mention_pooling_embed = torch.stack(embeds, dim=0)
-            logits = self.classifier_mention_pooling(mention_pooling_embed)
+            x = torch.stack(embeds, dim=0)      # (B, H), final output representation
+            # classify
+            x = self.linear(x)                           # (B, 2H)
+            x = self.dropout(x)                          # (B, 2H)
+            logits = self.classifier_mention_pooling(x)  # (B, C)
         elif output_method == 3:
-            hidden_states = outputs[0]
+            e1_pos = e1_pos[:, 0].unsqueeze(1)  # (B, 1)
+            hidden_states = outputs[0]          # (B, L, H)
             batch_size = e1_pos.shape[0]
             
-            # Get embedding of start markers
+            # print("e1_pos:", e1_pos)
+            # print(e1_pos.shape)
 
-            # BEGIN
-            # NEW
-            # Get entity start hidden state
-            # print("hidden_states:", hidden_states)
-            # print(hidden_states.shape)
+            exit(0)
+
+            # Get embedding of start markers
             onehot1 = torch.zeros(hidden_states.size()[:2]).float().to(input_ids.device)  # (B, L)
             onehot2 = torch.zeros(hidden_states.size()[:2]).float().to(input_ids.device)  # (B, L)
-            onehot1 = onehot1.scatter_(1, e1_pos, 1)
-            onehot2 = onehot2.scatter_(1, e2_pos, 1)
-            hidden1 = (onehot1.unsqueeze(2) * hidden_states).sum(1)  # (B, H)
-            hidden2 = (onehot2.unsqueeze(2) * hidden_states).sum(1)  # (B, H)
-            x = torch.cat([hidden1, hidden2], 1)
-            # print("hidden1:", hidden1)
-            # print(hidden1.shape)
-            # print("hidden2:", hidden2)
-            # print(hidden2.shape)
-
-            # OLD
-
-            # e1_start_index = e1_pos[range(batch_size), 0]
-            # e2_start_index = e2_pos[range(batch_size), 0]
-            # e1_start_embed = hidden_states[range(batch_size), e1_start_index]
-            # e2_start_embed = hidden_states[range(batch_size), e2_start_index]
-            # x = torch.cat((e1_start_embed, e2_start_embed), 1)
+            onehot1 = onehot1.scatter_(1, e1_pos, 1)                    # (B, L)
+            onehot2 = onehot2.scatter_(1, e2_pos, 1)                    # (B, L)
+            hidden1 = (onehot1.unsqueeze(2) * hidden_states).sum(1)     # (B, H)
+            hidden2 = (onehot2.unsqueeze(2) * hidden_states).sum(1)     # (B, H)
+            x = torch.cat([hidden1, hidden2], 1)                        # (B, 2H)
             
-            # print("hidden1:", e1_start_embed)
-            # print(e1_start_embed.shape)
-            # print("hidden2:", e2_start_embed)
-            # print(e2_start_embed.shape)
-
-            # classify
-            # print("x:", x)
-            # print(x.shape)
-            # exit(0)
-            
-            x = self.linear(x)
-            x = self.dropout(x)
-            logits = self.classifier_entity_start(x)
+            x = self.linear(x)                          # (B, 2H)
+            x = self.dropout(x)                         # (B, 2H)
+            logits = self.classifier_entity_start(x)    # (B, C)
         else:
             raise ValueError("Method must be one of [1, 2, 3]")
         return logits
@@ -184,6 +156,8 @@ class BertClassifier(BertPreTrainedModel):
         re_tokens = ['[CLS]'] + sent0 + ent0 + sent1 + ent1 + sent2 + ['[SEP]']
         pos1 = 1 + len(sent0) if not rev else 1 + len(sent0 + ent0 + sent1)
         pos2 = 1 + len(sent0 + ent0 + sent1) if not rev else 1 + len(sent0)
+        end1 = pos1 + len(ent0) + 1 if not rev else pos1 + len(ent1) + 1
+        end2 = pos2 + len(ent1) + 1 if not rev else pos2 + len(ent0) + 1
         pos1 = min(self.max_length - 1, pos1)
         pos2 = min(self.max_length - 1, pos2)
         
@@ -191,8 +165,8 @@ class BertClassifier(BertPreTrainedModel):
         avai_len = len(indexed_tokens)
 
         # Position
-        pos1 = torch.tensor([[pos1]]).long()
-        pos2 = torch.tensor([[pos2]]).long()
+        pos1 = torch.tensor([[pos1, end1]]).long()
+        pos2 = torch.tensor([[pos2, end2]]).long()
 
         # Padding
         while len(indexed_tokens) < self.max_length:

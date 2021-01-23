@@ -29,6 +29,8 @@ def parse_args():
     parser.add_argument('--optim', type=str, default='adamw', help='sgd, adam or adamw.')
     parser.add_argument('--num_epoch', type=int, default=16)
     parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--input_method', type=int, default=3)
+    parser.add_argument('--output_method', type=int, default=3)
     parser.add_argument('--max_grad_norm', type=float, default=5.0, help='Gradient clipping.')
     parser.add_argument('--log_step', type=int, default=50, help='Print log every k steps.')
     parser.add_argument('--log', type=str, default='logs.txt', help='Write training log to file.')
@@ -58,8 +60,8 @@ def train(args):
     # method
     input_method_name = ["", "standard", "positional_embedding", "entity_markers"]
     output_method_name = ["", "cls_token", "mention_pooling", "entity_start"]
-    input_method = 3
-    output_method = 3
+    input_method = args.input_method
+    output_method = args.output_method
     print(f"Input method: {input_method_name[input_method]}")
     print(f"Output method: {output_method_name[output_method]}")
 

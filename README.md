@@ -57,7 +57,7 @@ Parameters:
 | Positional emb. | Mention pooling |        |
 | Entity markers  | [CLS]           | 54.0   |
 | Entity markers  | Mention pooling | 48.1   |
-| Entity markers  | Entity start    | 59.1   |
+| Entity markers  | Entity start    | 69.3   |
 
 ## Developer's Note
 
