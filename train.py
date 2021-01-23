@@ -152,22 +152,10 @@ def train(args):
             optimizer.zero_grad()
             start_time = time.time()
 
-            # labels, input_ids, att_mask, e1_pos, e2_pos, e1_pos_seq, e2_pos_seq = batch
             for i in range(len(batch)):
                 if batch[i] is not None:
                     batch[i] = batch[i].to(device)
-
             labels, input_ids, att_mask, e1_pos, e2_pos = batch
-
-            # change device
-            # labels = labels.to(device)
-            # input_ids = input_ids.to(device)
-            # att_mask = att_mask.to(device)
-            # e1_pos = e1_pos.to(device)
-            # e2_pos = e2_pos.to(device)
-            # if input_method == 2:
-            #     e1_pos_seq = e1_pos_seq.to(device)
-            #     e2_pos_seq = e2_pos_seq.to(device)
 
             # pass to model
             logits = model(
@@ -190,12 +178,8 @@ def train(args):
                 print(format_str.format(timestr, global_step, train_steps, epoch,\
                         opt['num_epoch'], loss, duration))
 
-
-
             # optimize
             loss.backward()
-            # if (i + 1) % grad_acc_steps == 0: # gradient accumulation
-
             optimizer.step()
             if scheduler is not None:
                 scheduler.step()
@@ -211,18 +195,13 @@ def train(args):
         model.eval()
         with torch.no_grad():
             for i, batch in enumerate(dev_loader):
-                # labels, input_ids, att_mask, e1_pos, e2_pos, e1_pos_seq, e2_pos_seq = batch
-                labels, input_ids, att_mask, e1_pos, e2_pos = batch
-
+                
                 # change device
-                labels = labels.to(device)
-                input_ids = input_ids.to(device)
-                att_mask = att_mask.to(device)
-                e1_pos = e1_pos.to(device)
-                e2_pos = e2_pos.to(device)
-                if input_method == 2:
-                    e1_pos_seq = e1_pos_seq.to(device)
-                    e2_pos_seq = e2_pos_seq.to(device)
+                for i in range(len(batch)):
+                    if batch[i] is not None:
+                        batch[i] = batch[i].to(device)
+
+                labels, input_ids, att_mask, e1_pos, e2_pos = batch
                 
                 # pass to model
                 logits = model(
@@ -258,9 +237,6 @@ def train(args):
 
             # save
             model_file = model_save_dir + '/ckpt_epoch_{}.pt'.format(epoch)
-            # model.save(model_file, epoch)
-            # torch_utils.save(model, optim, opt, filename=model_file)
-            # torch.save({'state_dict': model.state_dict()}, model_file)
             torch.save(model, model_file)
             if len(list_dev_f1) == 0 or dev_f1 > max(list_dev_f1):      # best model
                 copyfile(model_file, model_save_dir + '/best_model.pt')

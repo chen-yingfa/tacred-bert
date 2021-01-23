@@ -97,11 +97,6 @@ class BertClassifier(BertPreTrainedModel):
             e1_pos = e1_pos[:, 0].unsqueeze(1)  # (B, 1)
             hidden_states = outputs[0]          # (B, L, H)
             batch_size = e1_pos.shape[0]
-            
-            # print("e1_pos:", e1_pos)
-            # print(e1_pos.shape)
-
-            exit(0)
 
             # Get embedding of start markers
             onehot1 = torch.zeros(hidden_states.size()[:2]).float().to(input_ids.device)  # (B, L)
