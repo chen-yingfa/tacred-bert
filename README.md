@@ -44,20 +44,21 @@ Not implemented yet.
 
 Parameters:
 
-- Weight Initialization: bert-base-uncased
-- Transformers Architecture: 12 layers, 768 hidden size, 12 heads
-- Batch size: 8
-- Learning Rate: 3e-5 with Adam
-- 1/10 of train set (because I don't have enough computing power)
+- Weight initialization: bert-base-uncased
+- Transformers architecture: 12 layers, 768 hidden size, 12 heads
+- Batch size: 64
+- Learning rate: 2e-5 with Adam,
+  - Warmup steps: 300
+  - Weight decay: 1e-5
 
-| Input type      | Output type     | Dev F1 |
-| --------------- | --------------- | ------ |
-| Standard        | [CLS]           | 15.5   |
-| Standard        | Mention pooling | 21.3   |
-| Positional emb. | Mention pooling |        |
-| Entity markers  | [CLS]           | 54.0   |
-| Entity markers  | Mention pooling | 48.1   |
-| Entity markers  | Entity start    | 69.3   |
+| Input type      | Output type     | Dev F1 | Test F1 |
+| --------------- | --------------- | ------ | ------- |
+| Standard        | [CLS]           |        |         |
+| Standard        | Mention pooling |        |         |
+| Positional emb. | Mention pooling |        |         |
+| Entity markers  | [CLS]           |        |         |
+| Entity markers  | Mention pooling | 64.8   |         |
+| Entity markers  | Entity start    | 69.3   | 69.3    |
 
 ## Developer's Note
 

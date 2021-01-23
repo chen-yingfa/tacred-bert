@@ -1,3 +1,4 @@
+import os
 import json
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -125,7 +126,7 @@ def REDataLoader(
         tokenizer,
         batch_size,
         shuffle,
-        num_workers=0,
+        num_workers=8,
         collate_fn=REDataset.collate_fn,
         **kwargs):
     dataset = REDataset(path=path, rel2id=rel2id, tokenizer=tokenizer, kwargs=kwargs)
@@ -145,22 +146,28 @@ def get_data_loaders(data_dir, label2id, tokenize, batch_size, shuffle_train=Tru
 
     Return: train_loader, dev_loader, test_loader
     """
+    num_workers = 8
+    if os.name == 'nt':
+        num_workers = 0
     train_loader = REDataLoader(
         data_dir + '/train.json',
         label2id,
         tokenize,
         batch_size,
-        shuffle_train)
+        shuffle_train,
+        num_workers=num_workers)
     dev_loader = REDataLoader(
         data_dir + '/dev.json',
         label2id,
         tokenize,
         batch_size,
-        False)
+        False,
+        num_workers=num_workers)
     test_loader = REDataLoader(
         data_dir + '/test.json',
         label2id,
         tokenize,
         batch_size,
-        False)
+        False,
+        num_workers=num_workers)
     return train_loader, dev_loader, test_loader

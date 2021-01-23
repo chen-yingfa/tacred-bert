@@ -16,7 +16,7 @@ from model.classifier_bert import BertClassifier
 # from model.bert import BertForSequenceClassification
 from matplotlib import pyplot as plt
 
-from dataset.loader import DataLoader, get_tokenizer
+from dataset.data_loader import DataLoader, get_tokenizer
 from dataset.dataset import get_data_loaders
 from utils import scorer, constant, helper, torch_utils
 
@@ -24,14 +24,12 @@ from utils import scorer, constant, helper, torch_utils
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir', type=str, default='dataset/tacred-small')
-    # parser.add_argument('--word_dropout', type=float, default=0.04, help='The rate at which randomly set a word to UNK.')
     parser.add_argument('--lr', type=float, default=2e-5, help='Applies to SGD and Adagrad.')
     parser.add_argument('--optim', type=str, default='adamw', help='sgd, adam or adamw.')
     parser.add_argument('--num_epoch', type=int, default=16)
-    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--input_method', type=int, default=3)
     parser.add_argument('--output_method', type=int, default=3)
-    # parser.add_argument('--max_grad_norm', type=float, default=5.0, help='Gradient clipping.')
     parser.add_argument('--log_step', type=int, default=50, help='Print log every k steps.')
     parser.add_argument('--log', type=str, default='logs.txt', help='Write training log to file.')
     parser.add_argument('--save_epoch', type=int, default=1, help='Save model checkpoints every k epochs.')

@@ -1,0 +1,1 @@
+python eval.py --data_dir=dataset/tacred --log_step=5 --batch_size=4

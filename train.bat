@@ -1,0 +1,1 @@
+python train.py --batch_size=8 --log_step=50
